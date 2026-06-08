@@ -45,6 +45,7 @@ In the REPL: type a request, watch it work. Mutating actions (writes, edits,
 shell commands) prompt for approval unless pre-approved in config.
 
 - `/help` — list commands
+- `/improve` — reflect on the session and propose an improvement PR (see below)
 - `/<name> [args]` — run a custom command (see below)
 - `/exit` — quit
 
@@ -126,6 +127,37 @@ the savings where it can:
 **Coming:** automatic conversation compaction once histories grow long
 (see `TODO.md`), which will keep input-token counts from compounding across
 many turns without any user action.
+
+## Self-improvement
+
+tiny-code can learn from how it's used. When a session ends (or when you run
+`/improve`), it reflects on the conversation transcript looking for recurring
+friction — tool errors, repeated retries, denied permissions, missing
+capabilities. If it finds a concrete improvement, it asks for your permission to
+open a pull request.
+
+That PR contains **only a single markdown file** under `improvements/`
+describing the proposed change, targeting `main` for a maintainer to review and
+implement separately. **It never contains code changes** — this is enforced
+structurally (the PR creator only ever stages one regex-validated markdown path),
+so a prompt-injected session cannot smuggle code into a PR.
+
+PRs are opened via the [`gh` CLI](https://cli.github.com/), which must be
+installed and authenticated (`gh auth login`); the working tree must be clean.
+
+```json
+{
+  "improve": {
+    "enabled": true,
+    "baseBranch": "main",
+    "onSessionEnd": true
+  }
+}
+```
+
+The feature is **on by default**. Set `improve.enabled` to `false` (or export
+`TINY_CODE_IMPROVE=0`) to disable it entirely; set `onSessionEnd` to `false` to
+keep `/improve` but skip the automatic reflection at exit.
 
 ## Development
 
