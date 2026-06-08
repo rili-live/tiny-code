@@ -20,7 +20,18 @@ export { PermissionGate } from './permissions/gate.js';
 export type { PermissionPrompt, PermissionRequest, PermissionChoice } from './permissions/gate.js';
 
 export { loadConfig } from './config/load.js';
-export type { ResolvedConfig, CliOverrides, Provider, Effort, AllowRules } from './config/load.js';
+export type { ResolvedConfig, CliOverrides, Provider, Effort, Priority, AllowRules } from './config/load.js';
+
+export {
+  MODEL_CATALOG,
+  CATALOG_AS_OF,
+  getModelInfo,
+  estimateCostUsd,
+  formatUsd,
+  blendedCostPerMTok,
+  recommendModel,
+} from './models/catalog.js';
+export type { ModelInfo, RecommendOptions } from './models/catalog.js';
 export { loadProjectContext } from './config/context.js';
 
 export { loadCommands, renderCommand } from './commands/loader.js';

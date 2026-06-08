@@ -51,6 +51,15 @@ Save/restore `AgentLoop.getMessages()` to disk; `--resume` to continue a session
 Pair with the compaction feature above so resumed sessions don't carry a bloated
 history.
 
+## Live model catalog refresh
+The model catalog (`src/models/catalog.ts`) is curated and offline, so its
+pricing and model list drift until a human updates them. **Approach:** an opt-in
+refresh that pulls current models/pricing from the provider APIs (Anthropic's
+`GET /v1/models` for capabilities; a pricing source for rates) and Gemini's
+equivalent, caching to disk with the `CATALOG_AS_OF` date. Gate behind a flag so
+the default stays offline and deterministic. Pairs with the existing
+priority-based selection — fresher data, same `recommendModel` logic.
+
 ## ripgrep-backed grep
 The `grep` tool currently walks the tree in JS. **Approach:** detect `rg` on
 PATH and shell out for speed + .gitignore awareness, falling back to the JS
