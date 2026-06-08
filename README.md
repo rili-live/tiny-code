@@ -45,6 +45,7 @@ In the REPL: type a request, watch it work. Mutating actions (writes, edits,
 shell commands) prompt for approval unless pre-approved in config.
 
 - `/help` — list commands
+- `/models` — show known models, pricing, and the active one (see below)
 - `/improve` — reflect on the session and propose an improvement PR (see below)
 - `/<name> [args]` — run a custom command (see below)
 - `/exit` — quit
@@ -84,6 +85,7 @@ CLI flags.
 {
   "provider": "anthropic",
   "model": "claude-opus-4-8",
+  "priority": "performance",
   "maxTokens": 16000,
   "thinking": true,
   "effort": "high",
@@ -127,6 +129,38 @@ the savings where it can:
 **Coming:** automatic conversation compaction once histories grow long
 (see `TODO.md`), which will keep input-token counts from compounding across
 many turns without any user action.
+
+## Model awareness & cost control
+
+tiny-code ships a small, curated catalog of coding models
+(`src/models/catalog.ts`) with each model's pricing, context window, and a
+relative coding-aptitude score. It uses this to turn raw token counts into real
+money and to pick a model that fits your cost/performance preference.
+
+- **Dollar cost, not just tokens.** Per-turn usage and the session total show an
+  estimated USD cost next to the token counts, priced from the active model's
+  rate — so the bill is visible as you work, not a surprise later.
+- **`/models`** lists the catalog (cheapest first) with pricing and scores,
+  marks the active model, and shows the session's running cost.
+- **Priority-driven selection.** When you don't pin a `model`, tiny-code picks
+  one for you based on `priority`:
+
+  | `priority`      | Picks                                                        |
+  | --------------- | ----------------------------------------------------------- |
+  | `performance`   | The most capable model (the default — current behavior).    |
+  | `cost`          | The cheapest still-capable model.                           |
+  | `balanced`      | The best capability-per-dollar among capable models.        |
+
+  ```json
+  { "priority": "balanced" }
+  ```
+
+  Or per-session with `TINY_CODE_PRIORITY=cost`. Pinning `model` (config, env,
+  or `--model`) always overrides the recommendation.
+
+The catalog is curated and offline (tiny-code has no live model-discovery yet —
+see `TODO.md`), so its prices carry an "as of" date; keep it current as vendors
+ship new models and change pricing.
 
 ## Self-improvement
 

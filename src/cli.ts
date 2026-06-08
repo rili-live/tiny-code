@@ -19,8 +19,10 @@ Options:
   -h, --help          Show this help
 
 Environment:
-  ANTHROPIC_API_KEY   Required for the Anthropic provider
-  GEMINI_API_KEY      Required for the Gemini provider
+  ANTHROPIC_API_KEY    Required for the Anthropic provider
+  GEMINI_API_KEY       Required for the Gemini provider
+  TINY_CODE_PRIORITY   performance | cost | balanced — auto-picks a model when
+                       none is pinned (default: performance)
 `;
 
 function main(): void {
