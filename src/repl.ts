@@ -61,7 +61,7 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
   });
 
   console.log(
-    pc.bold('therr-agent') + pc.dim(` · ${provider.name}:${provider.model} · ${cwd}`),
+    pc.bold('tiny-code') + pc.dim(` · ${provider.name}:${provider.model} · ${cwd}`),
   );
   if (projectContext.trim().length > 0) {
     console.log(pc.dim('Loaded project context.'));

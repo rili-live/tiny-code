@@ -1,10 +1,10 @@
 {
-  "name": "@therr/agent",
+  "name": "@therr/tiny-code",
   "version": "0.1.0",
   "description": "A small, extensible CLI coding agent with interchangeable Anthropic and Gemini models.",
   "type": "module",
   "bin": {
-    "therr-agent": "dist/cli.js"
+    "tiny-code": "dist/cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

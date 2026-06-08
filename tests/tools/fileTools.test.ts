@@ -12,7 +12,7 @@ import { grepTool } from '../../src/tools/grep.js';
 let cwd: string;
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), 'therr-agent-'));
+  cwd = await mkdtemp(join(tmpdir(), 'tiny-code-'));
 });
 
 afterEach(async () => {

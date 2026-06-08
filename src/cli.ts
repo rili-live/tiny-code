@@ -6,10 +6,10 @@ import type { CliOverrides, Provider } from './config/load.js';
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
 
-const USAGE = `therr-agent — a small, extensible CLI coding agent
+const USAGE = `tiny-code — a small, extensible CLI coding agent
 
 Usage:
-  therr-agent [options]
+  tiny-code [options]
 
 Options:
   --provider <name>   anthropic | gemini (default: inferred from API keys)

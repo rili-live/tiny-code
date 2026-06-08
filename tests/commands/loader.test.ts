@@ -7,7 +7,7 @@ import { loadCommands, renderCommand } from '../../src/commands/loader.js';
 let root: string;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'therr-cmd-'));
+  root = await mkdtemp(join(tmpdir(), 'tiny-code-cmd-'));
 });
 
 afterEach(async () => {

@@ -1,4 +1,4 @@
-# Project Instructions for therr-agent
+# Project Instructions for tiny-code
 
 This file is loaded into the agent's system prompt when it runs in this repo.
 

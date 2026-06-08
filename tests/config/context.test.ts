@@ -7,7 +7,7 @@ import { loadProjectContext } from '../../src/config/context.js';
 let root: string;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'therr-ctx-'));
+  root = await mkdtemp(join(tmpdir(), 'tiny-code-ctx-'));
 });
 
 afterEach(async () => {

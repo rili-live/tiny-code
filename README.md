@@ -1,17 +1,17 @@
-# therr-agent
+# tiny-code
 
 A small, extensible CLI coding agent. Interactive terminal REPL, interchangeable
 **Anthropic** and **Gemini** models, and just the core features you actually use:
 read/write/edit files, run shell commands, search code, and a custom
 commands/skills system. No business logic baked in.
 
-> Status: early (v0.x). The package/binary name (`@therr/agent` / `therr-agent`)
-> is a working name and may change before the first npm publish.
+> Status: early (v0.x). Published as `@therr/tiny-code`; the binary is
+> `tiny-code`. Names may change before the first npm publish.
 
 ## Install
 
 ```bash
-npm install -g @therr/agent
+npm install -g @therr/tiny-code
 ```
 
 Or run from source:
@@ -34,9 +34,9 @@ export GEMINI_API_KEY=...
 ## Usage
 
 ```bash
-therr-agent                       # start the REPL (uses an available key)
-therr-agent --provider gemini     # force a provider
-therr-agent --model claude-opus-4-8
+tiny-code                       # start the REPL (uses an available key)
+tiny-code --provider gemini     # force a provider
+tiny-code --model claude-opus-4-8
 ```
 
 In the REPL: type a request, watch it work. Mutating actions (writes, edits,
@@ -55,7 +55,7 @@ conventions there.
 ## Custom commands (skills)
 
 Drop markdown files with YAML frontmatter into `./.agent/commands/` (per project)
-or `~/.config/therr-agent/commands/` (global):
+or `~/.config/tiny-code/commands/` (global):
 
 ```markdown
 ---
@@ -73,8 +73,8 @@ after the command (appended if the placeholder is absent).
 
 ## Configuration
 
-Optional `therr-agent.config.json` in the project root (or
-`~/.config/therr-agent/config.json`). Precedence: defaults < config file < env <
+Optional `tiny-code.config.json` in the project root (or
+`~/.config/tiny-code/config.json`). Precedence: defaults < config file < env <
 CLI flags.
 
 ```json
