@@ -22,6 +22,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # TODO: Add an npm automation token (https://www.npmjs.com/settings/~/tokens)
+      # as the NPM_TOKEN repo secret, then re-enable the publish step below:
+      # - run: npm publish --access public
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
