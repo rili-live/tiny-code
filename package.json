@@ -1,6 +1,6 @@
 {
   "name": "@therr/tiny-code",
-  "version": "0.1.0",
+  "version": "0.1.0-beta",
   "description": "A small, extensible CLI coding agent with interchangeable Anthropic and Gemini models.",
   "type": "module",
   "bin": {
@@ -32,7 +32,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run build",
-    "release": "changeset publish"
+    "preversion": "npm run typecheck && npm run lint && npm test && npm run build",
+    "release:beta": "npm version prerelease --preid=beta -m \"release: v%s\" && npm publish --tag beta --access public && git push --follow-tags",
+    "release:patch": "npm version patch -m \"release: v%s\" && npm publish --access public && git push --follow-tags",
+    "release:minor": "npm version minor -m \"release: v%s\" && npm publish --access public && git push --follow-tags",
+    "release:major": "npm version major -m \"release: v%s\" && npm publish --access public && git push --follow-tags"
   },
   "keywords": [
     "cli",
@@ -43,7 +47,7 @@
     "gemini",
     "llm"
   ],
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.69.0",
     "@google/genai": "^1.30.0",

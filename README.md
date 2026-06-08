@@ -45,6 +45,7 @@ In the REPL: type a request, watch it work. Mutating actions (writes, edits,
 shell commands) prompt for approval unless pre-approved in config.
 
 - `/help` — list commands
+- `/clear` — clear the conversation history and start fresh
 - `/models` — show known models, pricing, and the active one (see below)
 - `/improve` — reflect on the session and propose an improvement PR (see below)
 - `/<name> [args]` — run a custom command (see below)
@@ -206,6 +207,52 @@ npm run build
 See `TODO.md` for the deferred-features backlog (sub-agents, web search, MCP,
 rich TUI, one-shot mode, conversation persistence).
 
+## Contributing
+
+Contributions are accepted from authorized contributors only, and are governed
+by the [License](#license) — by submitting a contribution you agree to those
+terms (including the assignment of rights in clause 4). This is **not** an
+open-source project: please do not fork, mirror, or redistribute the codebase
+(see the License).
+
+Workflow for an authorized change:
+
+1. Open an issue first to discuss the change and get sign-off from a maintainer.
+2. Branch from `main`, keep changes focused, and follow the existing code style.
+3. Before opening a PR, make sure the full check suite passes:
+
+   ```bash
+   npm run typecheck
+   npm run lint
+   npm test
+   npm run build
+   ```
+
+4. Add or update tests for any behavior change, and add a changeset
+   (`npx changeset`) when the change is user-facing.
+5. Open a PR targeting `main` for maintainer review.
+
+### Self-improvement workflow
+
+tiny-code can also propose its own improvements — a low-friction way to feed
+ideas back to maintainers without writing code. When a session ends (or when you
+run `/improve`), the agent reflects on the transcript for recurring friction
+(tool errors, repeated retries, denied permissions, missing capabilities) and,
+if it finds something concrete, asks permission to open a PR.
+
+That PR contains **only a single markdown file** under `improvements/`
+describing the proposed change — never code. This is enforced structurally (the
+PR creator only ever stages one regex-validated markdown path), so a
+prompt-injected session cannot smuggle code into a PR. A maintainer then reviews
+the proposal and implements it separately. See
+[Self-improvement](#self-improvement) above for configuration.
+
 ## License
 
-MIT
+**Proprietary — All Rights Reserved.** See [`LICENSE`](./LICENSE).
+
+You are granted a limited, revocable license to **install and use** tiny-code
+(e.g. via `npm install`) for your own internal or personal use. You may **not**
+fork, copy, modify, redistribute, resell, or offer it as a hosted service. It is
+free during the beta period; future versions may be offered under subscription
+or other paid terms.

@@ -26,6 +26,7 @@ import type { Usage } from './providers/types.js';
 function printHelp(commands: Map<string, Command>): void {
   console.log(pc.bold('\nBuilt-in:'));
   console.log('  /help            Show this help');
+  console.log('  /clear           Clear the conversation history and start fresh');
   console.log('  /models          Show known models, pricing, and the active one');
   console.log('  /improve         Reflect on this session and propose an improvement PR');
   console.log('  /exit, /quit     Leave the session');
@@ -165,6 +166,12 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     }
     if (input === '/help') {
       printHelp(commands);
+      ask();
+      return;
+    }
+    if (input === '/clear') {
+      agent.clearHistory();
+      console.log(pc.dim('Conversation history cleared.'));
       ask();
       return;
     }

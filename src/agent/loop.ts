@@ -58,6 +58,12 @@ export class AgentLoop {
     return this.messages;
   }
 
+  /** Drop the conversation history so the next turn starts fresh. Cumulative
+   *  token usage is preserved, since it reflects the whole session's cost. */
+  clearHistory(): void {
+    this.messages.length = 0;
+  }
+
   /** Cumulative token usage across all turns in this session. */
   getUsage(): Usage {
     return { ...this.sessionUsage };
