@@ -12,10 +12,12 @@ import { loadProjectContext } from './config/context.js';
 import { buildSystemPrompt } from './agent/systemPrompt.js';
 import { loadCommands, renderCommand } from './commands/loader.js';
 import type { Command } from './commands/types.js';
+import { runImprovement } from './improve/run.js';
 
 function printHelp(commands: Map<string, Command>): void {
   console.log(pc.bold('\nBuilt-in:'));
   console.log('  /help            Show this help');
+  console.log('  /improve         Reflect on this session and propose an improvement PR');
   console.log('  /exit, /quit     Leave the session');
   if (commands.size > 0) {
     console.log(pc.bold('\nCustom commands:'));
@@ -60,6 +62,44 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     maxIterations: config.maxIterations,
   });
 
+  // Tracks the transcript length at the last reflection, so the auto-trigger on
+  // exit doesn't re-run when nothing happened since a manual /improve.
+  let lastImprovedAt = 0;
+
+  const confirmPr = (title: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      const label = pc.yellow('\nOpen a PR with this improvement?');
+      rl.question(`${label} ${pc.dim(title)} [y/N] `, (answer) => {
+        resolve(/^y(es)?$/i.test(answer.trim()));
+      });
+    });
+
+  const improve = async (): Promise<void> => {
+    lastImprovedAt = agent.getMessages().length;
+    await runImprovement({
+      provider,
+      messages: agent.getMessages(),
+      cwd,
+      baseBranch: config.improve.baseBranch,
+      log: (line) => console.log(pc.dim(line)),
+      confirm: confirmPr,
+    });
+  };
+
+  // Auto-reflect when leaving via /exit or /quit — runs while readline is still
+  // open so the confirmation prompt works. Skipped if nothing happened since the
+  // last manual /improve.
+  const maybeAutoImprove = async (): Promise<void> => {
+    if (
+      config.improve.enabled &&
+      config.improve.onSessionEnd &&
+      agent.getMessages().length > lastImprovedAt
+    ) {
+      console.log(pc.dim('\nReflecting on this session…'));
+      await improve();
+    }
+  };
+
   console.log(
     pc.bold('tiny-code') + pc.dim(` · ${provider.name}:${provider.model} · ${cwd}`),
   );
@@ -75,11 +115,21 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
       return;
     }
     if (input === '/exit' || input === '/quit') {
+      await maybeAutoImprove();
       rl.close();
       return;
     }
     if (input === '/help') {
       printHelp(commands);
+      ask();
+      return;
+    }
+    if (input === '/improve') {
+      if (config.improve.enabled) {
+        await improve();
+      } else {
+        console.log(pc.dim('Self-improvement is disabled in config.'));
+      }
       ask();
       return;
     }
