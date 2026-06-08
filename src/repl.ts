@@ -111,7 +111,14 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
   };
 
   rl.on('close', () => {
-    console.log(pc.dim('\nBye.'));
+    const usage = agent.getUsage();
+    if (usage.inputTokens > 0 || usage.outputTokens > 0) {
+      const fmtN = (n: number) => n.toLocaleString('en-US');
+      console.log(
+        pc.dim(`\nSession: ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens total`),
+      );
+    }
+    console.log(pc.dim('Bye.'));
     process.exit(0);
   });
 
