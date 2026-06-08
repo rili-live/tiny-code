@@ -7,10 +7,10 @@ import { loadConfig } from '../../src/config/load.js';
 const ENV_KEYS = [
   'ANTHROPIC_API_KEY',
   'GEMINI_API_KEY',
-  'THERR_AGENT_PROVIDER',
-  'THERR_AGENT_MODEL',
-  'THERR_AGENT_MAX_TOKENS',
-  'THERR_AGENT_EFFORT',
+  'TINY_CODE_PROVIDER',
+  'TINY_CODE_MODEL',
+  'TINY_CODE_MAX_TOKENS',
+  'TINY_CODE_EFFORT',
   'HOME',
 ];
 
@@ -18,13 +18,13 @@ let cwd: string;
 let saved: Record<string, string | undefined>;
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), 'therr-cfg-'));
+  cwd = await mkdtemp(join(tmpdir(), 'tiny-code-cfg-'));
   saved = {};
   for (const k of ENV_KEYS) {
     saved[k] = process.env[k];
     delete process.env[k];
   }
-  // Isolate from any real ~/.config/therr-agent/config.json
+  // Isolate from any real ~/.config/tiny-code/config.json
   process.env.HOME = cwd;
 });
 
@@ -61,7 +61,7 @@ describe('loadConfig', () => {
 
   it('reads a project config file', async () => {
     await writeFile(
-      join(cwd, 'therr-agent.config.json'),
+      join(cwd, 'tiny-code.config.json'),
       JSON.stringify({
         provider: 'anthropic',
         maxTokens: 8000,
@@ -78,10 +78,10 @@ describe('loadConfig', () => {
 
   it('lets env override the config file model', async () => {
     await writeFile(
-      join(cwd, 'therr-agent.config.json'),
+      join(cwd, 'tiny-code.config.json'),
       JSON.stringify({ provider: 'anthropic', model: 'from-file' }),
     );
-    process.env.THERR_AGENT_MODEL = 'from-env';
+    process.env.TINY_CODE_MODEL = 'from-env';
     const cfg = loadConfig({}, cwd);
     expect(cfg.model).toBe('from-env');
   });

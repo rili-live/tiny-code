@@ -73,10 +73,10 @@ function readFileConfig(path: string): FileConfig {
  */
 export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.cwd()): ResolvedConfig {
   const home = homedir();
-  const homeConfig = readFileConfig(join(home, '.config', 'therr-agent', 'config.json'));
+  const homeConfig = readFileConfig(join(home, '.config', 'tiny-code', 'config.json'));
   const projectConfig = overrides.configPath
     ? readFileConfig(overrides.configPath)
-    : readFileConfig(join(cwd, 'therr-agent.config.json'));
+    : readFileConfig(join(cwd, 'tiny-code.config.json'));
   const file: FileConfig = { ...homeConfig, ...projectConfig };
 
   const env = process.env;
@@ -85,22 +85,22 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
 
   const provider: Provider =
     overrides.provider ??
-    (env.THERR_AGENT_PROVIDER as Provider | undefined) ??
+    (env.TINY_CODE_PROVIDER as Provider | undefined) ??
     file.provider ??
     (anthropicApiKey ? 'anthropic' : geminiApiKey ? 'gemini' : 'anthropic');
 
   const model =
-    overrides.model ?? env.THERR_AGENT_MODEL ?? file.model ?? DEFAULT_MODELS[provider];
+    overrides.model ?? env.TINY_CODE_MODEL ?? file.model ?? DEFAULT_MODELS[provider];
 
-  const maxTokens = env.THERR_AGENT_MAX_TOKENS
-    ? Number(env.THERR_AGENT_MAX_TOKENS)
+  const maxTokens = env.TINY_CODE_MAX_TOKENS
+    ? Number(env.TINY_CODE_MAX_TOKENS)
     : (file.maxTokens ?? 16_000);
 
-  const effort = (env.THERR_AGENT_EFFORT as Effort | undefined) ?? file.effort ?? 'high';
+  const effort = (env.TINY_CODE_EFFORT as Effort | undefined) ?? file.effort ?? 'high';
 
   const defaultCommandDirs = [
     join(cwd, '.agent', 'commands'),
-    join(home, '.config', 'therr-agent', 'commands'),
+    join(home, '.config', 'tiny-code', 'commands'),
   ];
 
   return {
