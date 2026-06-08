@@ -39,6 +39,15 @@ describe('createTerminalUI', () => {
     expect(out).toContain('max iterations');
   });
 
+  it('displays token usage per turn', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI();
+      ui.onUsage({ inputTokens: 1234, outputTokens: 567 });
+    });
+    expect(out).toContain('1,234');
+    expect(out).toContain('567');
+  });
+
   it('previews path- and pattern-based tools', () => {
     const out = capture(() => {
       const ui = createTerminalUI();

@@ -4,6 +4,8 @@ import type { PermissionGate } from '../permissions/gate.js';
 import type { ToolResult } from '../tools/types.js';
 import type { Message, ToolResultBlock, ToolUseBlock } from './types.js';
 
+export type { Usage };
+
 /** Sink for everything the loop wants to surface. The REPL provides the real one. */
 export interface AgentUI {
   onText(delta: string): void;
@@ -39,6 +41,7 @@ export class AgentLoop {
   private readonly cwd: string;
   private readonly maxIterations: number;
   private readonly messages: Message[] = [];
+  private sessionUsage: Usage = { inputTokens: 0, outputTokens: 0 };
 
   constructor(opts: AgentLoopOptions) {
     this.provider = opts.provider;
@@ -53,6 +56,11 @@ export class AgentLoop {
   /** Conversation history (for inspection / persistence). */
   getMessages(): readonly Message[] {
     return this.messages;
+  }
+
+  /** Cumulative token usage across all turns in this session. */
+  getUsage(): Usage {
+    return { ...this.sessionUsage };
   }
 
   /** Run one user turn to completion (through any number of tool round-trips). */
@@ -75,6 +83,8 @@ export class AgentLoop {
         } else if (event.type === 'tool_call') {
           toolCalls.push({ type: 'tool_use', id: event.id, name: event.name, input: event.input });
         } else {
+          this.sessionUsage.inputTokens += event.usage.inputTokens;
+          this.sessionUsage.outputTokens += event.usage.outputTokens;
           this.ui.onUsage(event.usage);
         }
       }
