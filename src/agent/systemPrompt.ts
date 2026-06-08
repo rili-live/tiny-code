@@ -13,7 +13,9 @@ Guidelines:
 - Read files before editing them. Prefer small, targeted edits.
 - When you run commands, explain briefly what you are doing only if it is non-obvious.
 - Match the conventions of the surrounding code.
-- When the task is complete, give a short summary of what changed. Do not narrate routine steps.`;
+- When the task is complete, give a short summary of what changed. Do not narrate routine steps.
+- Be concise. Avoid restating the task or narrating completed steps. Every output token has a cost.
+- Prefer targeted reads (offset/limit) and filtered searches (glob patterns) over reading entire files or scanning broadly.`;
 
 /** Compose the system prompt from persona, environment, tools, and project context. */
 export function buildSystemPrompt(params: SystemPromptParams): string {
