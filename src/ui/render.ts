@@ -1,6 +1,8 @@
 import pc from 'picocolors';
 import type { AgentUI } from '../agent/loop.js';
 import type { ToolResult } from '../tools/types.js';
+import type { ModelInfo } from '../models/catalog.js';
+import { estimateCostUsd, formatUsd } from '../models/catalog.js';
 
 function preview(name: string, input: unknown): string {
   const obj = (input ?? {}) as Record<string, unknown>;
@@ -19,8 +21,11 @@ function truncate(s: string, n: number): string {
   return oneLine.length > n ? `${oneLine.slice(0, n)}…` : oneLine;
 }
 
-/** Minimal streaming UI: assistant text inline, compact colored tool summaries. */
-export function createTerminalUI(): AgentUI {
+/**
+ * Minimal streaming UI: assistant text inline, compact colored tool summaries.
+ * Pass the active model's catalog info to also show a per-turn cost estimate.
+ */
+export function createTerminalUI(modelInfo?: ModelInfo): AgentUI {
   let atLineStart = true;
 
   const write = (s: string): void => {
@@ -51,7 +56,10 @@ export function createTerminalUI(): AgentUI {
       write(pc.yellow(`  ⊘ ${name} denied\n`));
     },
     onUsage(usage) {
-      write(pc.dim(`  ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens\n`));
+      const cost = modelInfo ? `  ${formatUsd(estimateCostUsd(usage, modelInfo))}` : '';
+      write(
+        pc.dim(`  ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens${cost}\n`),
+      );
     },
     onAssistantEnd() {
       ensureNewline();

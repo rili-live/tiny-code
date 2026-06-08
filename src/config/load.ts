@@ -2,9 +2,12 @@ import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
+import type { Priority } from '../models/catalog.js';
+import { recommendModel } from '../models/catalog.js';
 
 export type Provider = 'anthropic' | 'gemini';
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type { Priority } from '../models/catalog.js';
 
 /** Auto-approval rules that bypass the interactive permission prompt. */
 export interface AllowRules {
@@ -19,6 +22,8 @@ export interface AllowRules {
 export interface ResolvedConfig {
   provider: Provider;
   model: string;
+  /** Cost/performance bias used to auto-pick a model when none is pinned. */
+  priority: Priority;
   anthropicApiKey: string | undefined;
   geminiApiKey: string | undefined;
   maxTokens: number;
@@ -55,6 +60,7 @@ const FileConfigSchema = z
   .object({
     provider: z.enum(['anthropic', 'gemini']).optional(),
     model: z.string().optional(),
+    priority: z.enum(['performance', 'cost', 'balanced']).optional(),
     maxTokens: z.number().int().positive().optional(),
     thinking: z.boolean().optional(),
     effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
@@ -107,8 +113,17 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
     file.provider ??
     (anthropicApiKey ? 'anthropic' : geminiApiKey ? 'gemini' : 'anthropic');
 
+  const priority: Priority =
+    (env.TINY_CODE_PRIORITY as Priority | undefined) ?? file.priority ?? 'performance';
+
+  // When the user pins a model, honor it. Otherwise let the catalog pick the
+  // best fit for the cost/performance priority, falling back to a static
+  // default if the catalog has no entry for the provider.
+  const pinnedModel = overrides.model ?? env.TINY_CODE_MODEL ?? file.model;
   const model =
-    overrides.model ?? env.TINY_CODE_MODEL ?? file.model ?? DEFAULT_MODELS[provider];
+    pinnedModel ??
+    recommendModel({ provider, priority })?.id ??
+    DEFAULT_MODELS[provider];
 
   const maxTokens = env.TINY_CODE_MAX_TOKENS
     ? Number(env.TINY_CODE_MAX_TOKENS)
@@ -124,6 +139,7 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
   return {
     provider,
     model,
+    priority,
     anthropicApiKey,
     geminiApiKey,
     maxTokens,

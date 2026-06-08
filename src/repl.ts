@@ -13,10 +13,20 @@ import { buildSystemPrompt } from './agent/systemPrompt.js';
 import { loadCommands, renderCommand } from './commands/loader.js';
 import type { Command } from './commands/types.js';
 import { runImprovement } from './improve/run.js';
+import {
+  MODEL_CATALOG,
+  CATALOG_AS_OF,
+  getModelInfo,
+  estimateCostUsd,
+  formatUsd,
+  blendedCostPerMTok,
+} from './models/catalog.js';
+import type { Usage } from './providers/types.js';
 
 function printHelp(commands: Map<string, Command>): void {
   console.log(pc.bold('\nBuilt-in:'));
   console.log('  /help            Show this help');
+  console.log('  /models          Show known models, pricing, and the active one');
   console.log('  /improve         Reflect on this session and propose an improvement PR');
   console.log('  /exit, /quit     Leave the session');
   if (commands.size > 0) {
@@ -25,6 +35,35 @@ function printHelp(commands: Map<string, Command>): void {
       const hint = cmd.argumentHint ? pc.dim(` ${cmd.argumentHint}`) : '';
       console.log(`  /${cmd.name}${hint}  ${pc.dim(cmd.description)}`);
     }
+  }
+}
+
+/** Show the model catalog with pricing, ranked cheapest-first, marking the
+ *  active model and the live session cost so cost/performance is visible. */
+function printModels(activeModel: string, priority: string, usage: Usage): void {
+  console.log(
+    pc.bold(`\nModels`) +
+      pc.dim(` · priority: ${priority} · pricing per 1M tokens · as of ${CATALOG_AS_OF}`),
+  );
+  const ranked = [...MODEL_CATALOG].sort((a, b) => blendedCostPerMTok(a) - blendedCostPerMTok(b));
+  for (const m of ranked) {
+    const active = m.id === activeModel;
+    const marker = active ? pc.green('●') : ' ';
+    const id = active ? pc.bold(m.id.padEnd(22)) : m.id.padEnd(22);
+    const detail = pc.dim(
+      `in $${m.inputPricePerMTok}/out $${m.outputPricePerMTok}  score ${m.codingScore}`,
+    );
+    console.log(`${marker} ${id} ${detail}`);
+  }
+  const info = getModelInfo(activeModel);
+  if (info && (usage.inputTokens > 0 || usage.outputTokens > 0)) {
+    console.log(
+      pc.dim(
+        `\nThis session: ↑ ${usage.inputTokens.toLocaleString('en-US')} ↓ ${usage.outputTokens.toLocaleString('en-US')} tokens ≈ ${formatUsd(estimateCostUsd(usage, info))}`,
+      ),
+    );
+  } else if (!info) {
+    console.log(pc.dim(`\n(${activeModel} is not in the catalog — no cost estimate available.)`));
   }
 }
 
@@ -51,7 +90,8 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     });
 
   const gate = new PermissionGate(config.allow, prompt);
-  const ui = createTerminalUI();
+  const modelInfo = getModelInfo(config.model);
+  const ui = createTerminalUI(modelInfo);
   const agent = new AgentLoop({
     provider,
     registry,
@@ -100,8 +140,12 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     }
   };
 
+  const priceTag = modelInfo
+    ? ` · $${modelInfo.inputPricePerMTok}/$${modelInfo.outputPricePerMTok} per 1M in/out`
+    : '';
   console.log(
-    pc.bold('tiny-code') + pc.dim(` · ${provider.name}:${provider.model} · ${cwd}`),
+    pc.bold('tiny-code') +
+      pc.dim(` · ${provider.name}:${provider.model}${priceTag} · ${cwd}`),
   );
   if (projectContext.trim().length > 0) {
     console.log(pc.dim('Loaded project context.'));
@@ -121,6 +165,11 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     }
     if (input === '/help') {
       printHelp(commands);
+      ask();
+      return;
+    }
+    if (input === '/models') {
+      printModels(config.model, config.priority, agent.getUsage());
       ask();
       return;
     }
@@ -164,8 +213,11 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     const usage = agent.getUsage();
     if (usage.inputTokens > 0 || usage.outputTokens > 0) {
       const fmtN = (n: number) => n.toLocaleString('en-US');
+      const cost = modelInfo ? ` ≈ ${formatUsd(estimateCostUsd(usage, modelInfo))}` : '';
       console.log(
-        pc.dim(`\nSession: ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens total`),
+        pc.dim(
+          `\nSession: ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens total${cost}`,
+        ),
       );
     }
     console.log(pc.dim('Bye.'));
