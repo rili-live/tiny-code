@@ -27,6 +27,17 @@ export interface ResolvedConfig {
   maxIterations: number;
   commandDirs: string[];
   allow: AllowRules;
+  improve: ImproveConfig;
+}
+
+/** Settings for the self-improvement / proposal-PR feature. */
+export interface ImproveConfig {
+  /** Master switch for the whole feature (manual and automatic). */
+  enabled: boolean;
+  /** Branch PRs target. */
+  baseBranch: string;
+  /** Whether to reflect automatically when the session ends. */
+  onSessionEnd: boolean;
 }
 
 export interface CliOverrides {
@@ -54,6 +65,13 @@ const FileConfigSchema = z
         tools: z.array(z.string()).optional(),
         bash: z.array(z.string()).optional(),
         write: z.array(z.string()).optional(),
+      })
+      .optional(),
+    improve: z
+      .object({
+        enabled: z.boolean().optional(),
+        baseBranch: z.string().optional(),
+        onSessionEnd: z.boolean().optional(),
       })
       .optional(),
   })
@@ -117,6 +135,16 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
       tools: file.allow?.tools ?? [],
       bash: file.allow?.bash ?? [],
       write: file.allow?.write ?? [],
+    },
+    improve: {
+      enabled:
+        env.TINY_CODE_IMPROVE === '0'
+          ? false
+          : env.TINY_CODE_IMPROVE === '1'
+            ? true
+            : (file.improve?.enabled ?? true),
+      baseBranch: file.improve?.baseBranch ?? 'main',
+      onSessionEnd: file.improve?.onSessionEnd ?? true,
     },
   };
 }
