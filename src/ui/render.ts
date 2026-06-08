@@ -10,6 +10,10 @@ function preview(name: string, input: unknown): string {
   return JSON.stringify(obj);
 }
 
+function fmtN(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
 function truncate(s: string, n: number): string {
   const oneLine = s.replace(/\s*\n\s*/g, ' ').trim();
   return oneLine.length > n ? `${oneLine.slice(0, n)}…` : oneLine;
@@ -46,8 +50,8 @@ export function createTerminalUI(): AgentUI {
       ensureNewline();
       write(pc.yellow(`  ⊘ ${name} denied\n`));
     },
-    onUsage() {
-      // Token usage is available here; kept silent to reduce noise in the MVP.
+    onUsage(usage) {
+      write(pc.dim(`  ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens\n`));
     },
     onAssistantEnd() {
       ensureNewline();
