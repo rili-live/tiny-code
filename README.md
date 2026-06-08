@@ -5,13 +5,13 @@ A small, extensible CLI coding agent. Interactive terminal REPL, interchangeable
 read/write/edit files, run shell commands, search code, and a custom
 commands/skills system. No business logic baked in.
 
-> Status: early (v0.x). The package/binary name (`tiny-code`) may change before
-> the first npm publish.
+> Status: early (v0.x). Published as `@therr/tiny-code`; the binary is
+> `tiny-code`. Names may change before the first npm publish.
 
 ## Install
 
 ```bash
-npm install -g tiny-code
+npm install -g @therr/tiny-code
 ```
 
 Or run from source:

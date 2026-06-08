@@ -1,5 +1,5 @@
 {
-  "name": "tiny-code",
+  "name": "@therr/tiny-code",
   "version": "0.1.0",
   "description": "A small, extensible CLI coding agent with interchangeable Anthropic and Gemini models.",
   "type": "module",
