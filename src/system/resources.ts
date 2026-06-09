@@ -35,18 +35,33 @@ export function estimateModelRamGb(model: string): number {
   return params !== undefined ? Math.round(params * 0.6 + 1.5) : 4;
 }
 
+/**
+ * Fraction of total RAM a model may need before we warn. Leaves headroom for the
+ * OS and other apps; a model that wants nearly all of physical RAM will thrash.
+ */
+const CAPACITY_HEADROOM = 0.8;
+
 export interface LocalModelCheck {
   needGb: number;
   totalGb: number;
   freeGb: number;
-  /** True when the model likely won't fit comfortably in free memory. */
+  /** True when the model likely won't fit in this machine's RAM (capacity-based). */
   warn: boolean;
+  /**
+   * Soft hint: the model exceeds *currently free* memory. On Linux `free` is
+   * misleadingly low (most RAM is reclaimable cache), so this is advisory only —
+   * never the basis for the hard {@link warn}.
+   */
+  freeTight: boolean;
   /** True for small models (≤3B) that tool-call unreliably. */
   toolCallRisk: boolean;
 }
 
 /**
- * Compare a local model's memory footprint against the host's available RAM.
+ * Compare a local model's memory footprint against the host's RAM. The hard
+ * warning is capacity-based (`totalmem`), since that is what actually determines
+ * feasibility — Linux reports little "free" memory because it caches aggressively,
+ * so a free-memory test would spuriously warn on machines that run the model fine.
  * `mem` defaults to the live host readings but can be injected for testing.
  */
 export function checkLocalModel(
@@ -61,7 +76,8 @@ export function checkLocalModel(
     needGb,
     totalGb: round1(totalGb),
     freeGb: round1(freeGb),
-    warn: needGb > freeGb,
+    warn: needGb > totalGb * CAPACITY_HEADROOM,
+    freeTight: needGb > freeGb,
     toolCallRisk: params !== undefined && params <= 3,
   };
 }

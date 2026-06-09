@@ -18,15 +18,22 @@ describe('parseParamsB / estimateModelRamGb', () => {
 });
 
 describe('checkLocalModel', () => {
-  it('warns when the model needs more than the free memory', () => {
+  it('warns when the model needs more than the machine can hold', () => {
     const check = checkLocalModel('gemma3:27b', { total: 8 * GB, free: 4 * GB }); // ~16GB
     expect(check.warn).toBe(true);
     expect(check.needGb).toBe(16);
   });
 
-  it('does not warn when there is ample free memory and flags small-model tool risk', () => {
+  it('does not warn when total capacity is ample and flags small-model tool risk', () => {
     const check = checkLocalModel('gemma3:1b', { total: 64 * GB, free: 48 * GB });
     expect(check.warn).toBe(false);
     expect(check.toolCallRisk).toBe(true);
+  });
+
+  it('does not warn on low free memory when total capacity is sufficient (Linux cache case)', () => {
+    // 32GB box with only 2GB nominally free — gemma3:4b (~3GB) fits in capacity.
+    const check = checkLocalModel('gemma3:4b', { total: 32 * GB, free: 2 * GB });
+    expect(check.warn).toBe(false);
+    expect(check.freeTight).toBe(true); // soft hint still set
   });
 });
