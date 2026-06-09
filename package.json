@@ -32,7 +32,12 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run build",
-    "release": "changeset publish"
+    "postpublish": "git push --follow-tags",
+    "preversion": "npm run typecheck && npm run lint && npm test && npm run build",
+    "release:beta": "npm version prerelease --preid=beta -m \"release: v%s\" && npm publish --tag beta --access public",
+    "release:patch": "npm version patch -m \"release: v%s\" && npm publish --access public",
+    "release:minor": "npm version minor -m \"release: v%s\" && npm publish --access public",
+    "release:major": "npm version major -m \"release: v%s\" && npm publish --access public"
   },
   "keywords": [
     "cli",
@@ -43,7 +48,7 @@
     "gemini",
     "llm"
   ],
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.69.0",
     "@google/genai": "^1.30.0",

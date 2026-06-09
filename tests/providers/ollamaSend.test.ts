@@ -82,9 +82,74 @@ describe('OllamaProvider.send', () => {
     expect(call).toMatchObject({ name: 'ls', input: {} });
   });
 
+  it('retries without stream_options when the server rejects it with a 400', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('unknown field "stream_options"', { status: 400 }))
+      .mockResolvedValueOnce(sseResponse([{ choices: [{ delta: { content: 'ok' } }] }]));
+
+    const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
+    const events = await collect(provider);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    const retryBody = JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string);
+    expect(firstBody.stream_options).toEqual({ include_usage: true });
+    expect(retryBody.stream_options).toBeUndefined();
+    expect(events.filter((e) => e.type === 'text').map((e) => (e as { delta: string }).delta).join('')).toBe('ok');
+  });
+
+  it('forwards maxTokens as max_tokens, and omits it when unset', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(sseResponse([{ choices: [{ delta: { content: 'ok' } }] }]));
+
+    await collect(new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm', maxTokens: 256 }));
+    const capped = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(capped.max_tokens).toBe(256);
+
+    fetchMock.mockClear();
+    await collect(new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' }));
+    const uncapped = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(uncapped).not.toHaveProperty('max_tokens');
+  });
+
+  it('still parses a final usage frame that lacks a trailing newline', async () => {
+    const raw =
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+      'data: {"choices":[],"usage":{"prompt_tokens":3,"completion_tokens":4}}'; // no trailing \n
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(raw));
+        controller.close();
+      },
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+    );
+
+    const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
+    const done = (await collect(provider)).find((e) => e.type === 'done');
+    expect(done).toMatchObject({ usage: { inputTokens: 3, outputTokens: 4 } });
+  });
+
   it('throws a helpful error when Ollama is unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
     const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
     await expect(collect(provider)).rejects.toThrow(/Cannot reach Ollama/);
+  });
+
+  it('aborts and reports a timeout when the server goes silent', async () => {
+    // Never resolves on its own — only the idle-timeout abort can end it.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          (init as RequestInit).signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        }),
+    );
+    const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm', timeoutMs: 20 });
+    await expect(collect(provider)).rejects.toThrow(/went silent.*aborted/);
   });
 });

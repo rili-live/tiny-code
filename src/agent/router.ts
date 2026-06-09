@@ -8,21 +8,31 @@
  */
 export type TaskWeight = 'light' | 'heavy';
 
+/**
+ * Strong, unambiguous signals that a turn genuinely needs the frontier model.
+ * These rarely show up in routine one-line requests.
+ */
 const HEAVY_PATTERNS: RegExp[] = [
   /\brefactor(?:ing|ed)?\b/i,
   /\barchitect(?:ure|ural)?\b/i,
-  /\bdesign\b/i,
-  /\bdebug(?:ging|ged)?\b/i,
-  /\boptimi[sz]e\b/i,
   /\bmigrat(?:e|ion|ing)\b/i,
-  /\bimplement\b/i,
   /\bredesign\b/i,
   /\broot[- ]?cause\b/i,
-  /\bwhy (?:is|does|are|do|did)\b/i,
   /\bthink (?:hard|carefully|through|deeply)\b/i,
   /\bacross (?:the |multiple |several )?(?:files|modules|codebase)\b/i,
   /\bend[- ]to[- ]end\b/i,
 ];
+
+/**
+ * Verbs that signal a heavy task only when paired with a scope/complexity cue.
+ * On their own — "implement a getter", "debug this typo", "optimize the loop" —
+ * they're everyday coding and stay local; eagerly escalating them would blunt
+ * the local-first cost savings. The local model can still escalate itself via
+ * the `escalate` tool when it actually struggles.
+ */
+const AMBIGUOUS_VERBS = /\b(?:implement(?:s|ing|ed)?|debug(?:ging|ged)?|optimi[sz]e|design)\b/i;
+const SCOPE_CUES =
+  /\b(?:entire|whole|complete(?:ly)?|across|multiple|several|system|subsystem|pipeline|codebase|module|from scratch)\b/i;
 
 /** Number of file-path-looking tokens above which a turn is considered heavy. */
 const MULTI_FILE_THRESHOLD = 3;
@@ -37,6 +47,9 @@ export function classifyTurn(input: string): TaskWeight {
 
   const fileMentions = text.match(/[\w./-]+\.[a-z]{1,5}\b/gi) ?? [];
   if (fileMentions.length >= MULTI_FILE_THRESHOLD) return 'heavy';
+
+  // Ambiguous verbs escalate only alongside a scope/complexity cue.
+  if (AMBIGUOUS_VERBS.test(text) && SCOPE_CUES.test(text)) return 'heavy';
 
   return 'light';
 }

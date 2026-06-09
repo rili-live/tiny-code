@@ -5,16 +5,27 @@ import type { ToolResult } from '../tools/types.js';
 import type { Message, ToolResultBlock, ToolUseBlock } from './types.js';
 import type { ModelDecisionEngine, RouteDecision } from './decision/index.js';
 
+export type { Usage };
+
 /** Sink for everything the loop wants to surface. The REPL provides the real one. */
 export interface AgentUI {
   onText(delta: string): void;
   onToolStart(name: string, input: unknown): void;
   onToolResult(name: string, result: ToolResult): void;
   onToolDenied(name: string): void;
-  /** `model` identifies which model produced the usage (for accurate pricing). */
-  onUsage(usage: Usage, model?: string): void;
-  /** Fired when local-first routing escalates the turn to the frontier model. */
-  onRoute(provider: string, model: string, reason: string): void;
+  /**
+   * `model` and `provider` identify what produced the usage, so the UI can
+   * price it accurately — and tell an unpriced *cloud* turn (cost unknown) apart
+   * from a *local* turn (no API cost).
+   */
+  onUsage(usage: Usage, model?: string, provider?: string): void;
+  /**
+   * Fired when local-first routing sends a turn to the frontier model. `initial`
+   * is true when the turn *started* there (up-front classification), false when
+   * it was escalated mid-turn — so the UI doesn't claim "escalated" for a turn
+   * that never ran locally.
+   */
+  onRoute(provider: string, model: string, reason: string, initial?: boolean): void;
   onAssistantEnd(): void;
   onMaxIterations(): void;
 }
@@ -49,6 +60,15 @@ export class AgentLoop {
   private readonly maxIterations: number;
   private readonly engine: ModelDecisionEngine | undefined;
   private readonly messages: Message[] = [];
+  private sessionUsage: Usage = { inputTokens: 0, outputTokens: 0 };
+  /**
+   * Set once a turn escalates mid-flight (model request or stuck). Subsequent
+   * turns then start on the frontier model so a multi-turn hard task doesn't
+   * ping-pong back to the local model on each follow-up. Reset by clearHistory().
+   */
+  private escalatedSession = false;
+  /** The provider escalated to; reused to start follow-up turns once sticky. */
+  private escalatedProvider: ModelProvider | undefined;
 
   constructor(opts: AgentLoopOptions) {
     this.provider = opts.provider;
@@ -66,6 +86,20 @@ export class AgentLoop {
     return this.messages;
   }
 
+  /** Drop the conversation history so the next turn starts fresh. Cumulative
+   *  token usage is preserved, since it reflects the whole session's cost.
+   *  Also clears sticky escalation: a fresh conversation re-routes from scratch. */
+  clearHistory(): void {
+    this.messages.length = 0;
+    this.escalatedSession = false;
+    this.escalatedProvider = undefined;
+  }
+
+  /** Cumulative token usage across all turns in this session. */
+  getUsage(): Usage {
+    return { ...this.sessionUsage };
+  }
+
   /** Run one user turn to completion (through any number of tool round-trips). */
   async run(userInput: string): Promise<void> {
     this.messages.push({ role: 'user', content: [{ type: 'text', text: userInput }] });
@@ -76,9 +110,16 @@ export class AgentLoop {
     let consecutiveErrors = 0;
 
     if (this.engine) {
-      const initial = this.engine.selectInitial(userInput);
-      active = this.applyRoute(active, initial);
-      escalated = active !== this.provider;
+      if (this.escalatedSession && this.escalatedProvider) {
+        // A prior turn escalated; stay on the frontier model for follow-ups so a
+        // multi-turn hard task doesn't ping-pong back to the local model.
+        active = this.escalatedProvider;
+        escalated = true;
+      } else {
+        const initial = this.engine.selectInitial(userInput);
+        active = this.applyRoute(active, initial);
+        escalated = active !== this.provider;
+      }
     }
 
     for (let iteration = 0; iteration < this.maxIterations; iteration += 1) {
@@ -96,7 +137,9 @@ export class AgentLoop {
         } else if (event.type === 'tool_call') {
           toolCalls.push({ type: 'tool_use', id: event.id, name: event.name, input: event.input });
         } else {
-          this.ui.onUsage(event.usage, active.model);
+          this.sessionUsage.inputTokens += event.usage.inputTokens;
+          this.sessionUsage.outputTokens += event.usage.outputTokens;
+          this.ui.onUsage(event.usage, active.model, active.name);
         }
       }
 
@@ -134,6 +177,11 @@ export class AgentLoop {
         if (next) {
           active = this.applyRoute(active, next);
           escalated = active !== this.provider;
+          if (escalated) {
+            // Remember it so follow-up turns start here (sticky escalation).
+            this.escalatedSession = true;
+            this.escalatedProvider = active;
+          }
         }
       }
     }

@@ -10,7 +10,8 @@ export default defineConfig({
   platform: 'node',
   dts: true,
   clean: true,
-  sourcemap: true,
+  sourcemap: false,
+  minify: true,
   // Prepend a shebang so the published `cli.js` is directly executable.
   banner: ({ format }) => (format === 'esm' ? { js: '#!/usr/bin/env node' } : {}),
 });

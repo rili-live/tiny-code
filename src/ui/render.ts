@@ -2,7 +2,7 @@ import pc from 'picocolors';
 import type { AgentUI } from '../agent/loop.js';
 import type { ToolResult } from '../tools/types.js';
 import type { Usage } from '../providers/types.js';
-import { estimateCost, formatUsd } from '../providers/pricing.js';
+import { getModelInfo, estimateCostUsd, formatUsd } from '../models/catalog.js';
 
 function preview(name: string, input: unknown): string {
   const obj = (input ?? {}) as Record<string, unknown>;
@@ -20,6 +20,11 @@ function truncate(s: string, n: number): string {
 /** Compact token count, e.g. 1234 -> "1.2k". */
 function fmtTokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+/** Paid (non-local) providers, where missing pricing means "unknown" not "free". */
+function isCloud(provider?: string): boolean {
+  return provider === 'anthropic' || provider === 'gemini';
 }
 
 export interface SessionTotals {
@@ -75,24 +80,31 @@ export function createTerminalUI(opts: TerminalUIOptions = {}): TerminalUI {
       ensureNewline();
       write(pc.yellow(`  ⊘ ${name} denied\n`));
     },
-    onUsage(usage: Usage, model?: string) {
+    onUsage(usage: Usage, model?: string, provider?: string) {
       totals.inputTokens += usage.inputTokens;
       totals.outputTokens += usage.outputTokens;
-      const cost = estimateCost(model ?? opts.model ?? '', usage);
+      const info = getModelInfo(model ?? opts.model ?? '');
+      const cost = info ? estimateCostUsd(usage, info) : null;
       if (cost !== null) totals.cost += cost;
 
       if (!showUsage) return;
       ensureNewline();
       const tokens = `${fmtTokens(usage.inputTokens)} in / ${fmtTokens(usage.outputTokens)} out`;
-      const money =
-        cost !== null
-          ? `${formatUsd(cost)} turn · ${formatUsd(totals.cost)} session`
-          : 'local (no API cost)';
+      let money: string;
+      if (cost !== null) {
+        money = `${formatUsd(cost)} turn · ${formatUsd(totals.cost)} session`;
+      } else if (isCloud(provider ?? opts.provider)) {
+        // A paid cloud model we don't have pricing for — don't imply it was free.
+        money = 'cost unknown';
+      } else {
+        money = 'local (no API cost)';
+      }
       write(pc.dim(`· ${tokens} · ${money}\n`));
     },
-    onRoute(provider, model, reason) {
+    onRoute(provider, model, reason, initial) {
       ensureNewline();
-      write(pc.yellow(`↑ escalated to ${provider}:${model} (${reason})\n`));
+      const verb = initial ? '▸ routed to' : '↑ escalated to';
+      write(pc.yellow(`${verb} ${provider}:${model} (${reason})\n`));
     },
     onAssistantEnd() {
       ensureNewline();

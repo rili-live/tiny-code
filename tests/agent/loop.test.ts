@@ -275,12 +275,96 @@ describe('AgentLoop', () => {
     expect(events).toContain('text:rescued');
   });
 
+  it('stays on the frontier model for follow-up turns once escalated', async () => {
+    const escalateRegistry = createRegistry([echoTool, escalateTool]);
+    const local = new ScriptedProvider(
+      [[{ type: 'tool_call', id: 'e1', name: 'escalate', input: { reason: 'too hard' } }, DONE]],
+      'local',
+    );
+    const frontier = new ScriptedProvider(
+      [
+        [{ type: 'text', delta: 'handled' }, DONE], // finishes the escalated turn
+        [{ type: 'text', delta: 'follow-up' }, DONE], // next turn should land here too
+      ],
+      'big',
+      'anthropic',
+    );
+    const { ui } = recordingUI();
+    const loop = new AgentLoop({
+      provider: local,
+      registry: escalateRegistry,
+      gate: gateWith('yes'),
+      ui,
+      system: 'sys',
+      cwd: process.cwd(),
+      engine: new LocalFirstModelEngine({ primary: local, escalation: frontier, classify: () => 'light' }),
+    });
+
+    await loop.run('start small then get stuck');
+    await loop.run('a routine follow-up');
+
+    // The follow-up turn never touched the local provider.
+    expect(local.sent).toHaveLength(1);
+    expect(frontier.sent).toHaveLength(2);
+
+    // clearHistory resets stickiness: the next light turn goes back to local.
+    loop.clearHistory();
+    await loop.run('another light request');
+    expect(local.sent).toHaveLength(2);
+  });
+
   it('behaves as a single provider when no escalation is configured', async () => {
     const provider = new ScriptedProvider([[{ type: 'text', delta: 'hi' }, DONE]]);
     const { ui, events } = recordingUI();
     await makeLoop(provider, ui, gateWith('yes')).run('refactor the whole codebase');
     expect(provider.sent).toHaveLength(1);
     expect(events).not.toContain('route:anthropic:big:heavy task');
+  });
+
+  it('accumulates token usage across a single turn', async () => {
+    const provider = new ScriptedProvider([
+      [
+        { type: 'text', delta: 'hi' },
+        { type: 'done', usage: { inputTokens: 10, outputTokens: 5 }, stopReason: 'end_turn' },
+      ],
+    ]);
+    const { ui } = recordingUI();
+    const loop = makeLoop(provider, ui, gateWith('yes'));
+    await loop.run('hello');
+    expect(loop.getUsage()).toEqual({ inputTokens: 10, outputTokens: 5 });
+  });
+
+  it('accumulates token usage across multiple run() calls', async () => {
+    const provider = new ScriptedProvider([
+      [{ type: 'done', usage: { inputTokens: 10, outputTokens: 5 }, stopReason: 'end_turn' }],
+      [{ type: 'done', usage: { inputTokens: 20, outputTokens: 8 }, stopReason: 'end_turn' }],
+    ]);
+    const { ui } = recordingUI();
+    const loop = makeLoop(provider, ui, gateWith('yes'));
+    await loop.run('first');
+    await loop.run('second');
+    expect(loop.getUsage()).toEqual({ inputTokens: 30, outputTokens: 13 });
+  });
+
+  it('clears conversation history but preserves session usage', async () => {
+    const provider = new ScriptedProvider([
+      [{ type: 'done', usage: { inputTokens: 10, outputTokens: 5 }, stopReason: 'end_turn' }],
+      [{ type: 'done', usage: { inputTokens: 20, outputTokens: 8 }, stopReason: 'end_turn' }],
+    ]);
+    const { ui } = recordingUI();
+    const loop = makeLoop(provider, ui, gateWith('yes'));
+
+    await loop.run('first');
+    expect(loop.getMessages().length).toBeGreaterThan(0);
+
+    loop.clearHistory();
+    expect(loop.getMessages()).toHaveLength(0);
+    expect(loop.getUsage()).toEqual({ inputTokens: 10, outputTokens: 5 });
+
+    // Next turn starts fresh: the request carries only the new user message.
+    await loop.run('second');
+    expect(provider.sent[1]!.messages).toHaveLength(1);
+    expect(loop.getUsage()).toEqual({ inputTokens: 30, outputTokens: 13 });
   });
 
   it('stops at the iteration guard when tools never stop', async () => {

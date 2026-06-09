@@ -26,7 +26,11 @@ export function createProvider(config: ResolvedConfig): ModelProvider {
 
   if (config.provider === 'ollama') {
     // No API key required — Ollama runs locally.
-    return new OllamaProvider({ baseUrl: config.ollamaBaseUrl, model: config.model });
+    return new OllamaProvider({
+      baseUrl: config.ollamaBaseUrl,
+      model: config.model,
+      maxTokens: config.maxTokens,
+    });
   }
 
   if (!config.geminiApiKey) {

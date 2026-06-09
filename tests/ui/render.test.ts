@@ -39,6 +39,14 @@ describe('createTerminalUI', () => {
     expect(out).toContain('max iterations');
   });
 
+  it('displays token usage per turn', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI();
+      ui.onUsage({ inputTokens: 1234, outputTokens: 567 });
+    });
+    expect(out).toContain('1.2k in / 567 out');
+  });
+
   it('previews path- and pattern-based tools', () => {
     const out = capture(() => {
       const ui = createTerminalUI();
@@ -69,6 +77,17 @@ describe('createTerminalUI', () => {
     expect(out).toContain('local (no API cost)');
   });
 
+  it('shows "cost unknown" for an unpriced cloud model rather than implying it is free', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI({ provider: 'anthropic' });
+      // A future/untracked cloud model id that the catalog has no pricing for.
+      ui.onUsage({ inputTokens: 100, outputTokens: 100 }, 'claude-opus-5');
+      expect(ui.getTotals().cost).toBe(0);
+    });
+    expect(out).toContain('cost unknown');
+    expect(out).not.toContain('no API cost');
+  });
+
   it('stays silent when showUsage is false but still tracks totals', () => {
     const out = capture(() => {
       const ui = createTerminalUI({ model: 'claude-opus-4-8', showUsage: false });
@@ -78,12 +97,21 @@ describe('createTerminalUI', () => {
     expect(out).toBe('');
   });
 
-  it('renders an escalation route line', () => {
+  it('renders a mid-turn escalation route line', () => {
     const out = capture(() => {
       const ui = createTerminalUI();
-      ui.onRoute('anthropic', 'claude-opus-4-8', 'heavy task');
+      ui.onRoute('anthropic', 'claude-opus-4-8', 'requested by model');
     });
     expect(out).toContain('escalated to anthropic:claude-opus-4-8');
-    expect(out).toContain('heavy task');
+    expect(out).toContain('requested by model');
+  });
+
+  it('renders up-front routing as "routed to", not "escalated"', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI();
+      ui.onRoute('anthropic', 'claude-opus-4-8', 'heavy task', true);
+    });
+    expect(out).toContain('routed to anthropic:claude-opus-4-8');
+    expect(out).not.toContain('escalated');
   });
 });

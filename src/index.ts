@@ -11,8 +11,6 @@ export type { SystemPromptParams } from './agent/systemPrompt.js';
 export { createProvider, AnthropicProvider, GeminiProvider, OllamaProvider } from './providers/index.js';
 export type { ModelProvider, ProviderEvent, SendRequest, ToolSchema, Usage } from './providers/types.js';
 export { toOpenAiMessages, toOpenAiTools } from './providers/ollama.js';
-export { PRICING, estimateCost, formatUsd } from './providers/pricing.js';
-export type { ModelPricing } from './providers/pricing.js';
 
 export { classifyTurn } from './agent/router.js';
 export type { TaskWeight } from './agent/router.js';
@@ -31,7 +29,18 @@ export { PermissionGate } from './permissions/gate.js';
 export type { PermissionPrompt, PermissionRequest, PermissionChoice } from './permissions/gate.js';
 
 export { loadConfig } from './config/load.js';
-export type { ResolvedConfig, CliOverrides, Provider, Effort, AllowRules, Routing, EscalateTarget } from './config/load.js';
+export type { ResolvedConfig, CliOverrides, Provider, Effort, Priority, AllowRules, Routing, EscalateTarget } from './config/load.js';
+
+export {
+  MODEL_CATALOG,
+  CATALOG_AS_OF,
+  getModelInfo,
+  estimateCostUsd,
+  formatUsd,
+  blendedCostPerMTok,
+  recommendModel,
+} from './models/catalog.js';
+export type { ModelInfo, RecommendOptions } from './models/catalog.js';
 export { loadProjectContext } from './config/context.js';
 
 export { loadCommands, renderCommand } from './commands/loader.js';

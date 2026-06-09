@@ -10,7 +10,6 @@ import { escalateTool } from './tools/escalate.js';
 import { createProvider } from './providers/index.js';
 import { LocalFirstModelEngine } from './agent/decision/index.js';
 import type { ModelDecisionEngine } from './agent/decision/index.js';
-import { formatUsd } from './providers/pricing.js';
 import { checkLocalModel } from './system/resources.js';
 import { loadConfig } from './config/load.js';
 import type { CliOverrides, ResolvedConfig } from './config/load.js';
@@ -18,6 +17,16 @@ import { loadProjectContext } from './config/context.js';
 import { buildSystemPrompt } from './agent/systemPrompt.js';
 import { loadCommands, renderCommand } from './commands/loader.js';
 import type { Command } from './commands/types.js';
+import { runImprovement } from './improve/run.js';
+import {
+  MODEL_CATALOG,
+  CATALOG_AS_OF,
+  getModelInfo,
+  estimateCostUsd,
+  formatUsd,
+  blendedCostPerMTok,
+} from './models/catalog.js';
+import type { Usage } from './providers/types.js';
 
 const COST_TIPS = [
   'Let the local model handle searches, listing, and small edits; save the frontier model for heavy lifting.',
@@ -45,6 +54,9 @@ function printHelp(commands: Map<string, Command>): void {
   console.log(pc.bold('\nBuilt-in:'));
   console.log('  /help            Show this help');
   console.log('  /costs           Show token usage, est. cost, and cost-saving tips');
+  console.log('  /clear           Clear the conversation history and start fresh');
+  console.log('  /models          Show known models, pricing, and the active one');
+  console.log('  /improve         Reflect on this session and propose an improvement PR');
   console.log('  /exit, /quit     Leave the session');
   if (commands.size > 0) {
     console.log(pc.bold('\nCustom commands:'));
@@ -52,6 +64,35 @@ function printHelp(commands: Map<string, Command>): void {
       const hint = cmd.argumentHint ? pc.dim(` ${cmd.argumentHint}`) : '';
       console.log(`  /${cmd.name}${hint}  ${pc.dim(cmd.description)}`);
     }
+  }
+}
+
+/** Show the model catalog with pricing, ranked cheapest-first, marking the
+ *  active model and the live session cost so cost/performance is visible. */
+function printModels(activeModel: string, priority: string, usage: Usage): void {
+  console.log(
+    pc.bold(`\nModels`) +
+      pc.dim(` · priority: ${priority} · pricing per 1M tokens · as of ${CATALOG_AS_OF}`),
+  );
+  const ranked = [...MODEL_CATALOG].sort((a, b) => blendedCostPerMTok(a) - blendedCostPerMTok(b));
+  for (const m of ranked) {
+    const active = m.id === activeModel;
+    const marker = active ? pc.green('●') : ' ';
+    const id = active ? pc.bold(m.id.padEnd(22)) : m.id.padEnd(22);
+    const detail = pc.dim(
+      `in $${m.inputPricePerMTok}/out $${m.outputPricePerMTok}  score ${m.codingScore}`,
+    );
+    console.log(`${marker} ${id} ${detail}`);
+  }
+  const info = getModelInfo(activeModel);
+  if (info && (usage.inputTokens > 0 || usage.outputTokens > 0)) {
+    console.log(
+      pc.dim(
+        `\nThis session: ↑ ${usage.inputTokens.toLocaleString('en-US')} ↓ ${usage.outputTokens.toLocaleString('en-US')} tokens ≈ ${formatUsd(estimateCostUsd(usage, info))}`,
+      ),
+    );
+  } else if (!info) {
+    console.log(pc.dim(`\n(${activeModel} is not in the catalog — no cost estimate available.)`));
   }
 }
 
@@ -101,6 +142,7 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     });
 
   const gate = new PermissionGate(config.allow, prompt);
+  const modelInfo = getModelInfo(config.model);
   const ui = createTerminalUI({ model: provider.model, provider: provider.name });
   const agent = new AgentLoop({
     provider,
@@ -113,11 +155,54 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     engine,
   });
 
+  // Tracks the transcript length at the last reflection, so the auto-trigger on
+  // exit doesn't re-run when nothing happened since a manual /improve.
+  let lastImprovedAt = 0;
+
+  const confirmPr = (title: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      const label = pc.yellow('\nOpen a PR with this improvement?');
+      rl.question(`${label} ${pc.dim(title)} [y/N] `, (answer) => {
+        resolve(/^y(es)?$/i.test(answer.trim()));
+      });
+    });
+
+  const improve = async (): Promise<void> => {
+    lastImprovedAt = agent.getMessages().length;
+    await runImprovement({
+      provider,
+      messages: agent.getMessages(),
+      cwd,
+      baseBranch: config.improve.baseBranch,
+      log: (line) => console.log(pc.dim(line)),
+      confirm: confirmPr,
+    });
+  };
+
+  // Auto-reflect when leaving via /exit or /quit — runs while readline is still
+  // open so the confirmation prompt works. Skipped if nothing happened since the
+  // last manual /improve.
+  const maybeAutoImprove = async (): Promise<void> => {
+    if (
+      config.improve.enabled &&
+      config.improve.onSessionEnd &&
+      agent.getMessages().length > lastImprovedAt
+    ) {
+      console.log(pc.dim('\nReflecting on this session…'));
+      await improve();
+    }
+  };
+
   const routeNote = localFirst
     ? pc.dim(` → escalates to ${config.escalateTo!.provider}:${config.escalateTo!.model}`)
     : '';
+  const priceTag = modelInfo
+    ? ` · $${modelInfo.inputPricePerMTok}/$${modelInfo.outputPricePerMTok} per 1M in/out`
+    : '';
   console.log(
-    pc.bold('tiny-code') + pc.dim(` · ${provider.name}:${provider.model} · ${cwd}`) + routeNote,
+    pc.bold('tiny-code') +
+      pc.dim(` · ${provider.name}:${provider.model}${priceTag} · ${cwd}`) +
+      routeNote,
   );
 
   // Compute-cost advisory for local models: does this machine have the RAM?
@@ -150,6 +235,7 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
       return;
     }
     if (input === '/exit' || input === '/quit') {
+      await maybeAutoImprove();
       rl.close();
       return;
     }
@@ -160,6 +246,26 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     }
     if (input === '/costs') {
       printCosts(ui, config);
+      ask();
+      return;
+    }
+    if (input === '/clear') {
+      agent.clearHistory();
+      console.log(pc.dim('Conversation history cleared.'));
+      ask();
+      return;
+    }
+    if (input === '/models') {
+      printModels(config.model, config.priority, agent.getUsage());
+      ask();
+      return;
+    }
+    if (input === '/improve') {
+      if (config.improve.enabled) {
+        await improve();
+      } else {
+        console.log(pc.dim('Self-improvement is disabled in config.'));
+      }
       ask();
       return;
     }
@@ -191,7 +297,17 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
   };
 
   rl.on('close', () => {
-    console.log(pc.dim('\nBye.'));
+    const usage = agent.getUsage();
+    if (usage.inputTokens > 0 || usage.outputTokens > 0) {
+      const fmtN = (n: number) => n.toLocaleString('en-US');
+      const cost = modelInfo ? ` ≈ ${formatUsd(estimateCostUsd(usage, modelInfo))}` : '';
+      console.log(
+        pc.dim(
+          `\nSession: ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens total${cost}`,
+        ),
+      );
+    }
+    console.log(pc.dim('Bye.'));
     process.exit(0);
   });
 
