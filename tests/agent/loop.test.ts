@@ -251,6 +251,45 @@ describe('AgentLoop', () => {
     expect(events).toContain('text:handled');
   });
 
+  it('stays on the frontier model for follow-up turns once escalated', async () => {
+    const escalateRegistry = createRegistry([echoTool, escalateTool]);
+    const local = new ScriptedProvider(
+      [[{ type: 'tool_call', id: 'e1', name: 'escalate', input: { reason: 'too hard' } }, DONE]],
+      'local',
+    );
+    const frontier = new ScriptedProvider(
+      [
+        [{ type: 'text', delta: 'handled' }, DONE], // finishes the escalated turn
+        [{ type: 'text', delta: 'follow-up' }, DONE], // next turn should land here too
+      ],
+      'big',
+      'anthropic',
+    );
+    const { ui } = recordingUI();
+    const loop = new AgentLoop({
+      provider: local,
+      registry: escalateRegistry,
+      gate: gateWith('yes'),
+      ui,
+      system: 'sys',
+      cwd: process.cwd(),
+      escalationProvider: frontier,
+      router: () => 'light',
+    });
+
+    await loop.run('start small then get stuck');
+    await loop.run('a routine follow-up');
+
+    // The follow-up turn never touched the local provider.
+    expect(local.sent).toHaveLength(1);
+    expect(frontier.sent).toHaveLength(2);
+
+    // clearHistory resets stickiness: the next light turn goes back to local.
+    loop.clearHistory();
+    await loop.run('another light request');
+    expect(local.sent).toHaveLength(2);
+  });
+
   it('behaves as a single provider when no escalation is configured', async () => {
     const provider = new ScriptedProvider([[{ type: 'text', delta: 'hi' }, DONE]]);
     const { ui, events } = recordingUI();

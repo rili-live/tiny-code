@@ -63,6 +63,12 @@ export class AgentLoop {
   private readonly router: ((input: string) => 'light' | 'heavy') | undefined;
   private readonly messages: Message[] = [];
   private sessionUsage: Usage = { inputTokens: 0, outputTokens: 0 };
+  /**
+   * Set once a turn escalates mid-flight (model request or stuck). Subsequent
+   * turns then start on the frontier model so a multi-turn hard task doesn't
+   * ping-pong back to the local model on each follow-up. Reset by clearHistory().
+   */
+  private escalatedSession = false;
 
   constructor(opts: AgentLoopOptions) {
     this.provider = opts.provider;
@@ -82,9 +88,11 @@ export class AgentLoop {
   }
 
   /** Drop the conversation history so the next turn starts fresh. Cumulative
-   *  token usage is preserved, since it reflects the whole session's cost. */
+   *  token usage is preserved, since it reflects the whole session's cost.
+   *  Also clears sticky escalation: a fresh conversation re-routes from scratch. */
   clearHistory(): void {
     this.messages.length = 0;
+    this.escalatedSession = false;
   }
 
   /** Cumulative token usage across all turns in this session. */
@@ -97,8 +105,16 @@ export class AgentLoop {
     this.messages.push({ role: 'user', content: [{ type: 'text', text: userInput }] });
     const tools = this.registry.toSchemas();
 
-    let active = this.selectInitialProvider(userInput);
-    let escalated = active === this.escalationProvider;
+    let active: ModelProvider;
+    let escalated: boolean;
+    if (this.escalatedSession && this.escalationProvider) {
+      // A prior turn escalated; stay on the frontier model for follow-ups.
+      active = this.escalationProvider;
+      escalated = true;
+    } else {
+      active = this.selectInitialProvider(userInput);
+      escalated = active === this.escalationProvider;
+    }
     let consecutiveErrors = 0;
 
     for (let iteration = 0; iteration < this.maxIterations; iteration += 1) {
@@ -168,9 +184,11 @@ export class AgentLoop {
     return this.provider;
   }
 
-  /** Switch to the frontier provider mid-turn. Falls back to the primary if unset. */
+  /** Switch to the frontier provider mid-turn. Falls back to the primary if unset.
+   *  Marks the session as escalated so follow-up turns stay on the frontier model. */
   private escalate(reason: string): ModelProvider {
     if (!this.escalationProvider) return this.provider;
+    this.escalatedSession = true;
     this.ui.onRoute(this.escalationProvider.name, this.escalationProvider.model, reason);
     return this.escalationProvider;
   }
