@@ -77,6 +77,17 @@ describe('createTerminalUI', () => {
     expect(out).toContain('local (no API cost)');
   });
 
+  it('shows "cost unknown" for an unpriced cloud model rather than implying it is free', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI({ provider: 'anthropic' });
+      // A future/untracked cloud model id that the catalog has no pricing for.
+      ui.onUsage({ inputTokens: 100, outputTokens: 100 }, 'claude-opus-5');
+      expect(ui.getTotals().cost).toBe(0);
+    });
+    expect(out).toContain('cost unknown');
+    expect(out).not.toContain('no API cost');
+  });
+
   it('stays silent when showUsage is false but still tracks totals', () => {
     const out = capture(() => {
       const ui = createTerminalUI({ model: 'claude-opus-4-8', showUsage: false });

@@ -22,6 +22,11 @@ function fmtTokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
+/** Paid (non-local) providers, where missing pricing means "unknown" not "free". */
+function isCloud(provider?: string): boolean {
+  return provider === 'anthropic' || provider === 'gemini';
+}
+
 export interface SessionTotals {
   inputTokens: number;
   outputTokens: number;
@@ -75,7 +80,7 @@ export function createTerminalUI(opts: TerminalUIOptions = {}): TerminalUI {
       ensureNewline();
       write(pc.yellow(`  ⊘ ${name} denied\n`));
     },
-    onUsage(usage: Usage, model?: string) {
+    onUsage(usage: Usage, model?: string, provider?: string) {
       totals.inputTokens += usage.inputTokens;
       totals.outputTokens += usage.outputTokens;
       const info = getModelInfo(model ?? opts.model ?? '');
@@ -85,10 +90,15 @@ export function createTerminalUI(opts: TerminalUIOptions = {}): TerminalUI {
       if (!showUsage) return;
       ensureNewline();
       const tokens = `${fmtTokens(usage.inputTokens)} in / ${fmtTokens(usage.outputTokens)} out`;
-      const money =
-        cost !== null
-          ? `${formatUsd(cost)} turn · ${formatUsd(totals.cost)} session`
-          : 'local (no API cost)';
+      let money: string;
+      if (cost !== null) {
+        money = `${formatUsd(cost)} turn · ${formatUsd(totals.cost)} session`;
+      } else if (isCloud(provider ?? opts.provider)) {
+        // A paid cloud model we don't have pricing for — don't imply it was free.
+        money = 'cost unknown';
+      } else {
+        money = 'local (no API cost)';
+      }
       write(pc.dim(`· ${tokens} · ${money}\n`));
     },
     onRoute(provider, model, reason) {

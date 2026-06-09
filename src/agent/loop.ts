@@ -12,8 +12,12 @@ export interface AgentUI {
   onToolStart(name: string, input: unknown): void;
   onToolResult(name: string, result: ToolResult): void;
   onToolDenied(name: string): void;
-  /** `model` identifies which model produced the usage (for accurate pricing). */
-  onUsage(usage: Usage, model?: string): void;
+  /**
+   * `model` and `provider` identify what produced the usage, so the UI can
+   * price it accurately — and tell an unpriced *cloud* turn (cost unknown) apart
+   * from a *local* turn (no API cost).
+   */
+  onUsage(usage: Usage, model?: string, provider?: string): void;
   /** Fired when local-first routing escalates the turn to the frontier model. */
   onRoute(provider: string, model: string, reason: string): void;
   onAssistantEnd(): void;
@@ -109,7 +113,7 @@ export class AgentLoop {
         } else {
           this.sessionUsage.inputTokens += event.usage.inputTokens;
           this.sessionUsage.outputTokens += event.usage.outputTokens;
-          this.ui.onUsage(event.usage, active.model);
+          this.ui.onUsage(event.usage, active.model, active.name);
         }
       }
 
