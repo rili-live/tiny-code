@@ -18,8 +18,13 @@ export interface AgentUI {
    * from a *local* turn (no API cost).
    */
   onUsage(usage: Usage, model?: string, provider?: string): void;
-  /** Fired when local-first routing escalates the turn to the frontier model. */
-  onRoute(provider: string, model: string, reason: string): void;
+  /**
+   * Fired when local-first routing sends a turn to the frontier model. `initial`
+   * is true when the turn *started* there (up-front classification), false when
+   * it was escalated mid-turn — so the UI doesn't claim "escalated" for a turn
+   * that never ran locally.
+   */
+  onRoute(provider: string, model: string, reason: string, initial?: boolean): void;
   onAssistantEnd(): void;
   onMaxIterations(): void;
 }
@@ -157,7 +162,7 @@ export class AgentLoop {
   /** Pick the provider for a turn: heavy tasks start on the frontier model. */
   private selectInitialProvider(input: string): ModelProvider {
     if (this.escalationProvider && this.router && this.router(input) === 'heavy') {
-      this.ui.onRoute(this.escalationProvider.name, this.escalationProvider.model, 'heavy task');
+      this.ui.onRoute(this.escalationProvider.name, this.escalationProvider.model, 'heavy task', true);
       return this.escalationProvider;
     }
     return this.provider;

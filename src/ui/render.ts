@@ -101,9 +101,10 @@ export function createTerminalUI(opts: TerminalUIOptions = {}): TerminalUI {
       }
       write(pc.dim(`· ${tokens} · ${money}\n`));
     },
-    onRoute(provider, model, reason) {
+    onRoute(provider, model, reason, initial) {
       ensureNewline();
-      write(pc.yellow(`↑ escalated to ${provider}:${model} (${reason})\n`));
+      const verb = initial ? '▸ routed to' : '↑ escalated to';
+      write(pc.yellow(`${verb} ${provider}:${model} (${reason})\n`));
     },
     onAssistantEnd() {
       ensureNewline();

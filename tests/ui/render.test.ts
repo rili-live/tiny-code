@@ -97,12 +97,21 @@ describe('createTerminalUI', () => {
     expect(out).toBe('');
   });
 
-  it('renders an escalation route line', () => {
+  it('renders a mid-turn escalation route line', () => {
     const out = capture(() => {
       const ui = createTerminalUI();
-      ui.onRoute('anthropic', 'claude-opus-4-8', 'heavy task');
+      ui.onRoute('anthropic', 'claude-opus-4-8', 'requested by model');
     });
     expect(out).toContain('escalated to anthropic:claude-opus-4-8');
-    expect(out).toContain('heavy task');
+    expect(out).toContain('requested by model');
+  });
+
+  it('renders up-front routing as "routed to", not "escalated"', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI();
+      ui.onRoute('anthropic', 'claude-opus-4-8', 'heavy task', true);
+    });
+    expect(out).toContain('routed to anthropic:claude-opus-4-8');
+    expect(out).not.toContain('escalated');
   });
 });
