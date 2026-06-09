@@ -36,6 +36,7 @@ export {
   CATALOG_AS_OF,
   getModelInfo,
   estimateCostUsd,
+  estimateCost,
   formatUsd,
   blendedCostPerMTok,
   recommendModel,

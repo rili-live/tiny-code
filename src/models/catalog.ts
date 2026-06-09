@@ -66,6 +66,16 @@ export function estimateCostUsd(usage: Usage, info: ModelInfo): number {
   );
 }
 
+/**
+ * Estimate the USD cost of a token usage for a model id, or `null` when the
+ * model isn't in the catalog — e.g. a local/Ollama model that has no API price.
+ * A `null` means "no known price", not "free"; callers decide how to present it.
+ */
+export function estimateCost(modelId: string, usage: Usage): number | null {
+  const info = getModelInfo(modelId);
+  return info ? estimateCostUsd(usage, info) : null;
+}
+
 /** Format a USD amount with precision that stays readable for tiny costs. */
 export function formatUsd(amount: number): string {
   return `$${amount.toFixed(amount < 1 ? 4 : 2)}`;

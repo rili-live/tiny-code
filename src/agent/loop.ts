@@ -117,7 +117,7 @@ export class AgentLoop {
         escalated = true;
       } else {
         const initial = this.engine.selectInitial(userInput);
-        active = this.applyRoute(active, initial);
+        active = this.applyRoute(active, initial, true);
         escalated = active !== this.provider;
       }
     }
@@ -192,10 +192,17 @@ export class AgentLoop {
   /**
    * Apply a routing decision: switch to its provider and surface an `onRoute`
    * event when it actually changes the active provider and carries a reason.
+   * `initial` distinguishes up-front routing ("routed to") from a mid-turn
+   * hand-off ("escalated to") so the UI never claims a turn was escalated when
+   * it started on the frontier model.
    */
-  private applyRoute(active: ModelProvider, decision: RouteDecision): ModelProvider {
+  private applyRoute(
+    active: ModelProvider,
+    decision: RouteDecision,
+    initial = false,
+  ): ModelProvider {
     if (decision.provider !== active && decision.reason) {
-      this.ui.onRoute(decision.provider.name, decision.provider.model, decision.reason);
+      this.ui.onRoute(decision.provider.name, decision.provider.model, decision.reason, initial);
     }
     return decision.provider;
   }

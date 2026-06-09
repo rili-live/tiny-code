@@ -45,7 +45,7 @@ function recordingUI(): { ui: AgentUI; events: string[] } {
     onToolResult: (n, r) => events.push(`result:${n}:${r.output}:${r.isError ?? false}`),
     onToolDenied: (n) => events.push(`denied:${n}`),
     onUsage: () => events.push('usage'),
-    onRoute: (p, m, r) => events.push(`route:${p}:${m}:${r}`),
+    onRoute: (p, m, r, initial) => events.push(`route:${p}:${m}:${r}:${initial ? 'initial' : 'escalated'}`),
     onAssistantEnd: () => events.push('assistantEnd'),
     onMaxIterations: () => events.push('maxIter'),
   };
@@ -196,7 +196,7 @@ describe('AgentLoop', () => {
 
     expect(frontier.sent).toHaveLength(1);
     expect(local.sent).toHaveLength(0);
-    expect(events).toContain('route:anthropic:big:heavy task');
+    expect(events).toContain('route:anthropic:big:heavy task:initial');
   });
 
   it('keeps a light turn on the local provider', async () => {
@@ -245,7 +245,7 @@ describe('AgentLoop', () => {
     // First send on local, second (post-escalation) on frontier.
     expect(local.sent).toHaveLength(1);
     expect(frontier.sent).toHaveLength(1);
-    expect(events).toContain('route:anthropic:big:requested by model');
+    expect(events).toContain('route:anthropic:big:requested by model:escalated');
     expect(events).toContain('text:handled');
   });
 
@@ -271,7 +271,7 @@ describe('AgentLoop', () => {
 
     expect(local.sent).toHaveLength(3);
     expect(frontier.sent).toHaveLength(1);
-    expect(events).toContain('route:anthropic:big:stuck — repeated tool errors');
+    expect(events).toContain('route:anthropic:big:stuck — repeated tool errors:escalated');
     expect(events).toContain('text:rescued');
   });
 

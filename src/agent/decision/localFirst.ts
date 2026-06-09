@@ -1,7 +1,7 @@
 import type { ModelProvider } from '../../providers/types.js';
 import { classifyTurn, type TaskWeight } from '../router.js';
 import { checkLocalModel } from '../../system/resources.js';
-import { estimateCost } from '../../providers/pricing.js';
+import { estimateCost } from '../../models/catalog.js';
 import type { ModelDecisionEngine, RouteDecision, TurnSignals } from './types.js';
 
 export interface LocalFirstOptions {
