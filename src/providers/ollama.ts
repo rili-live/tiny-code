@@ -30,6 +30,12 @@ interface OpenAiMessage {
  * `/v1/chat/completions` endpoint accepts). Unlike Gemini, OpenAI correlates
  * tool results to calls by `tool_call_id`, and our Anthropic-style ids survive
  * the round trip — so no id synthesis is needed.
+ *
+ * Assumes the loop never mixes plain text and tool results in one user turn in a
+ * way that would interleave them: we emit all `tool` messages first, then any
+ * text as a trailing user message. OpenAI requires each `tool` message to follow
+ * the assistant `tool_calls` that produced it; today's loop builds messages so
+ * that holds. If a future change interleaves them, revisit this ordering.
  */
 export function toOpenAiMessages(messages: Message[]): OpenAiMessage[] {
   const out: OpenAiMessage[] = [];
