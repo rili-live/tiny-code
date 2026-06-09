@@ -114,6 +114,25 @@ describe('OllamaProvider.send', () => {
     expect(uncapped).not.toHaveProperty('max_tokens');
   });
 
+  it('still parses a final usage frame that lacks a trailing newline', async () => {
+    const raw =
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+      'data: {"choices":[],"usage":{"prompt_tokens":3,"completion_tokens":4}}'; // no trailing \n
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(raw));
+        controller.close();
+      },
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+    );
+
+    const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
+    const done = (await collect(provider)).find((e) => e.type === 'done');
+    expect(done).toMatchObject({ usage: { inputTokens: 3, outputTokens: 4 } });
+  });
+
   it('throws a helpful error when Ollama is unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
     const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });

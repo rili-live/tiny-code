@@ -231,6 +231,20 @@ export class OllamaProvider implements ModelProvider {
   }
 }
 
+/** Decode a single SSE line into a chunk, or `undefined` for non-data/keep-alive lines. */
+function parseSseLine(raw: string): StreamChunk | undefined {
+  const line = raw.trim();
+  if (!line.startsWith('data:')) return undefined;
+  const payload = line.slice(5).trim();
+  if (payload === '[DONE]' || payload.length === 0) return undefined;
+  try {
+    return JSON.parse(payload) as StreamChunk;
+  } catch {
+    // Ignore partial/non-JSON keep-alive lines.
+    return undefined;
+  }
+}
+
 /** Parse an SSE byte stream into decoded JSON chunks, skipping the `[DONE]` sentinel. */
 async function* parseSse(body: ReadableStream<Uint8Array>): AsyncIterable<StreamChunk> {
   const decoder = new TextDecoder();
@@ -243,18 +257,15 @@ async function* parseSse(body: ReadableStream<Uint8Array>): AsyncIterable<Stream
       buffer += decoder.decode(value, { stream: true });
       let nl: number;
       while ((nl = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.slice(0, nl).trim();
+        const chunk = parseSseLine(buffer.slice(0, nl));
         buffer = buffer.slice(nl + 1);
-        if (!line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (payload === '[DONE]' || payload.length === 0) continue;
-        try {
-          yield JSON.parse(payload) as StreamChunk;
-        } catch {
-          // Ignore partial/non-JSON keep-alive lines.
-        }
+        if (chunk) yield chunk;
       }
     }
+    // Emit a final line that arrived without a trailing newline (e.g. a closing
+    // usage frame); otherwise the last chunk's token counts would be dropped.
+    const tail = parseSseLine(buffer);
+    if (tail) yield tail;
   } finally {
     reader.releaseLock();
   }
