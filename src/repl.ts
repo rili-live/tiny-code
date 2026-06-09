@@ -1,4 +1,5 @@
 import * as readline from 'node:readline';
+import { createRequire } from 'node:module';
 import pc from 'picocolors';
 import { createTerminalUI } from './ui/render.js';
 import type { TerminalUI } from './ui/render.js';
@@ -27,6 +28,10 @@ import {
   blendedCostPerMTok,
 } from './models/catalog.js';
 import type { Usage } from './providers/types.js';
+import { getUpdateNotice, maybeRefreshUpdateCache, formatUpdateNotice } from './system/updateCheck.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { name: string; version: string };
 
 const COST_TIPS = [
   'Let the local model handle searches, listing, and small edits; save the frontier model for heavy lifting.',
@@ -204,6 +209,13 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
       pc.dim(` · ${provider.name}:${provider.model}${priceTag} · ${cwd}`) +
       routeNote,
   );
+
+  // Reminder to upgrade the npm package, shown instantly from the cached check.
+  // The refresh runs in the background (never blocks startup) so a freshly
+  // published version surfaces on the next session.
+  const updateNotice = getUpdateNotice({ name: pkg.name, version: pkg.version });
+  if (updateNotice) console.log(pc.yellow(formatUpdateNotice(updateNotice)));
+  void maybeRefreshUpdateCache({ name: pkg.name, version: pkg.version });
 
   // Compute-cost advisory for local models: does this machine have the RAM?
   if (provider.name === 'ollama') {
