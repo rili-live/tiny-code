@@ -104,4 +104,18 @@ describe('OllamaProvider.send', () => {
     const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
     await expect(collect(provider)).rejects.toThrow(/Cannot reach Ollama/);
   });
+
+  it('aborts and reports a timeout when the server goes silent', async () => {
+    // Never resolves on its own — only the idle-timeout abort can end it.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          (init as RequestInit).signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        }),
+    );
+    const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm', timeoutMs: 20 });
+    await expect(collect(provider)).rejects.toThrow(/went silent.*aborted/);
+  });
 });
