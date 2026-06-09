@@ -106,6 +106,13 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
   const config = loadConfig(overrides, cwd);
   const provider = createProvider(config); // throws with a clear message if the API key is missing
 
+  // Reflection is a bounded analysis pass, not a coding task. Run it with low
+  // effort and extended thinking off: high-effort thinking over a large session
+  // transcript can blow past the Anthropic SDK's 10-minute per-request ceiling
+  // (-> "Request timed out."), and it needlessly burns tokens. Gemini/Ollama
+  // ignore these Anthropic-only knobs.
+  const reflectionProvider = createProvider({ ...config, effort: 'low', thinking: false });
+
   // Local-first routing: build the frontier provider and expose the `escalate` tool.
   const localFirst = config.routing === 'local-first' && config.escalateTo !== undefined;
   const escalationProvider = localFirst
@@ -175,7 +182,7 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
   const improve = async (): Promise<void> => {
     lastImprovedAt = agent.getMessages().length;
     await runImprovement({
-      provider,
+      provider: reflectionProvider,
       messages: agent.getMessages(),
       cwd,
       baseBranch: config.improve.baseBranch,
