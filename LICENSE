@@ -1,0 +1,65 @@
+tiny-code — Proprietary Software License
+Copyright (c) 2026 Zack Anselm. All rights reserved.
+
+This software and its associated source code, documentation, and other files
+(collectively, the "Software") are the exclusive property of the copyright
+holder and are protected by copyright and other intellectual property laws.
+
+1. Grant of Use.
+   Subject to your continued compliance with this License (and with any
+   additional subscription or paid-plan terms the copyright holder may publish),
+   the copyright holder grants you a limited, personal, non-exclusive,
+   non-transferable, non-sublicensable, revocable license to install and run the
+   Software, as distributed in object/built form through official distribution
+   channels (such as the npm registry), solely for your own internal or personal
+   use. This includes making the incidental copies that normal installation and
+   execution require (e.g., the copy created by `npm install` and any local
+   cache). No other rights are granted, whether by implication, estoppel, or
+   otherwise.
+
+2. Future and Paid Terms.
+   The Software is offered free of charge during its pre-release ("beta") period.
+   The copyright holder reserves the right to introduce subscription, usage, or
+   other paid terms for some or all future versions, and to condition continued
+   use of new versions on acceptance of those terms. Such terms, once published
+   or agreed, control to the extent they conflict with this License.
+
+3. Restrictions.
+   Except as expressly permitted in Section 1, you may NOT, in whole or in part:
+     (a) fork, clone, mirror, republish, or otherwise redistribute the Software,
+         its source code, or this repository, or make it available to any third
+         party;
+     (b) modify, adapt, translate, reverse engineer, decompile, disassemble, or
+         create derivative works of the Software, except to the limited extent
+         this restriction is prohibited by applicable law;
+     (c) sublicense, lease, rent, sell, resell, or offer the Software as a hosted
+         or managed service to third parties;
+     (d) use the Software, or any portion of it, to build, train, or improve any
+         competing product or machine-learning model; or
+     (e) remove, obscure, or alter any copyright, trademark, or other proprietary
+         notice contained in the Software.
+
+4. Contributions.
+   Any contribution you submit to this project (e.g., via pull request) is
+   provided to the copyright holder under these same terms, and you assign to
+   the copyright holder all right, title, and interest in such contribution,
+   to the maximum extent permitted by law. See the "Contributing" section of
+   the README for the limited workflow that is permitted.
+
+5. No Warranty.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+6. Limitation of Liability.
+   IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+   OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+   ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+7. Termination.
+   Any breach of these terms automatically and immediately terminates the
+   license granted in Section 1, and you must cease all use of the Software and
+   destroy all copies in your possession or control.
+
+For licensing inquiries, contact the copyright holder.

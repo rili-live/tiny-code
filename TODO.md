@@ -3,6 +3,20 @@
 Deferred features, roughly in priority order. Each entry notes the rationale and
 a rough approach so it can be picked up later.
 
+Token efficiency is a first-class goal. Features that reduce token usage
+automatically (without user configuration) are prioritized over features that
+add capability at higher cost.
+
+## Conversation compaction
+Input tokens compound quickly in long sessions because the full message history
+is resent every turn. Compaction trims the history automatically once it grows
+past a threshold, keeping costs from ballooning without any user action.
+**Approach:** track cumulative `inputTokens` from `AgentLoop.getUsage()`; when
+it crosses a configurable threshold (e.g. 50k), summarize earlier messages into
+a single condensed block. For Anthropic use the compaction beta; for Gemini
+summarize via a lightweight call to a cheap model. Pair with conversation
+persistence so compacted sessions can be resumed.
+
 ## Sub-agents
 Spawn isolated agent runs for parallel exploration/research (like a lightweight
 Explore/Plan agent). **Approach:** a `spawn_agent` tool whose `execute` constructs
@@ -47,8 +61,17 @@ exits; permission gate falls back to allowlist-only (no prompts).
 
 ## Conversation persistence / resume
 Save/restore `AgentLoop.getMessages()` to disk; `--resume` to continue a session.
-Pair with token-budget-aware compaction once histories get long (Anthropic
-compaction beta; manual summarization for Gemini).
+Pair with the compaction feature above so resumed sessions don't carry a bloated
+history.
+
+## Live model catalog refresh
+The model catalog (`src/models/catalog.ts`) is curated and offline, so its
+pricing and model list drift until a human updates them. **Approach:** an opt-in
+refresh that pulls current models/pricing from the provider APIs (Anthropic's
+`GET /v1/models` for capabilities; a pricing source for rates) and Gemini's
+equivalent, caching to disk with the `CATALOG_AS_OF` date. Gate behind a flag so
+the default stays offline and deterministic. Pairs with the existing
+priority-based selection — fresher data, same `recommendModel` logic.
 
 ## ripgrep-backed grep
 The `grep` tool currently walks the tree in JS. **Approach:** detect `rg` on

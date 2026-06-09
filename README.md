@@ -1,9 +1,11 @@
 # tiny-code
 
-A small, extensible CLI coding agent. Interactive terminal REPL, interchangeable
-**Anthropic**, **Gemini**, and **local (Ollama)** models, and just the core
-features you actually use: read/write/edit files, run shell commands, search
-code, and a custom commands/skills system. No business logic baked in.
+A small, extensible CLI coding agent built around one constraint: **keep token
+usage low**. As coding-agent costs climb, tiny-code automates the savings so
+you don't have to. Interactive terminal REPL, interchangeable **Anthropic**,
+**Gemini**, and **local (Ollama)** models, and just the core features you
+actually use: read/write/edit files, run shell commands, search code, and a
+custom commands/skills system. No business logic baked in.
 
 Run cheap, open-weight models locally and **escalate heavy work to a frontier
 model only when needed** — see [Local models & cost-aware routing](#local-models--cost-aware-routing).
@@ -48,6 +50,9 @@ shell commands) prompt for approval unless pre-approved in config.
 
 - `/help` — list commands
 - `/costs` — session token usage, estimated $ cost, and cost-saving tips
+- `/clear` — clear the conversation history and start fresh
+- `/models` — show known models, pricing, and the active one (see below)
+- `/improve` — reflect on the session and propose an improvement PR (see below)
 - `/<name> [args]` — run a custom command (see below)
 - `/exit` — quit
 
@@ -128,6 +133,7 @@ CLI flags.
   "provider": "anthropic",
   "model": "claude-opus-4-8",
   "ollamaBaseUrl": "http://localhost:11434/v1",
+  "priority": "performance",
   "maxTokens": 16000,
   "thinking": true,
   "effort": "high",
@@ -150,8 +156,100 @@ CLI flags.
 automatically whenever `escalateTo` is present. `ollamaBaseUrl` points at your
 Ollama server's OpenAI-compatible endpoint.
 
-Approximate cloud pricing used for the `/costs` estimate lives in
-`src/providers/pricing.ts` — edit it to match current vendor rates.
+Approximate cloud pricing used for the `/costs` estimate lives in the model
+catalog (`src/models/catalog.ts`) — edit it to match current vendor rates.
+
+## Token efficiency
+
+Minimizing token usage is a first-class goal — coding-agent bills grow fast,
+and you shouldn't need a complex setup to control them. tiny-code automates
+the savings where it can:
+
+- **Usage visible by default.** Every assistant turn prints `↑ in  ↓ out tokens`
+  with no configuration. On exit you get a session total.
+- **Bounded tool output.** grep caps at 200 matches, glob at 500 files, and
+  `read_file` supports `offset`/`limit` to pull only the lines you need —
+  preventing runaway context growth automatically.
+- **Minimal system prompt.** The built-in persona is kept short. Tool schemas
+  are generated from Zod (no duplicate prose). Project context is opt-in.
+- **Concise agent instructions.** The agent is explicitly told to avoid
+  restating the task or narrating completed steps.
+- **Effort control.** For Anthropic models, `effort` tunes the adaptive
+  thinking budget. Drop it from the default `"high"` to `"medium"` or `"low"`
+  for simpler, cheaper tasks:
+
+  ```json
+  { "effort": "medium" }
+  ```
+
+  Or set it per-session with `TINY_CODE_EFFORT=medium`.
+
+**Coming:** automatic conversation compaction once histories grow long
+(see `TODO.md`), which will keep input-token counts from compounding across
+many turns without any user action.
+
+## Model awareness & cost control
+
+tiny-code ships a small, curated catalog of coding models
+(`src/models/catalog.ts`) with each model's pricing, context window, and a
+relative coding-aptitude score. It uses this to turn raw token counts into real
+money and to pick a model that fits your cost/performance preference.
+
+- **Dollar cost, not just tokens.** Per-turn usage and the session total show an
+  estimated USD cost next to the token counts, priced from the active model's
+  rate — so the bill is visible as you work, not a surprise later.
+- **`/models`** lists the catalog (cheapest first) with pricing and scores,
+  marks the active model, and shows the session's running cost.
+- **Priority-driven selection.** When you don't pin a `model`, tiny-code picks
+  one for you based on `priority`:
+
+  | `priority`      | Picks                                                        |
+  | --------------- | ----------------------------------------------------------- |
+  | `performance`   | The most capable model (the default — current behavior).    |
+  | `cost`          | The cheapest still-capable model.                           |
+  | `balanced`      | The best capability-per-dollar among capable models.        |
+
+  ```json
+  { "priority": "balanced" }
+  ```
+
+  Or per-session with `TINY_CODE_PRIORITY=cost`. Pinning `model` (config, env,
+  or `--model`) always overrides the recommendation.
+
+The catalog is curated and offline (tiny-code has no live model-discovery yet —
+see `TODO.md`), so its prices carry an "as of" date; keep it current as vendors
+ship new models and change pricing.
+
+## Self-improvement
+
+tiny-code can learn from how it's used. When a session ends (or when you run
+`/improve`), it reflects on the conversation transcript looking for recurring
+friction — tool errors, repeated retries, denied permissions, missing
+capabilities. If it finds a concrete improvement, it asks for your permission to
+open a pull request.
+
+That PR contains **only a single markdown file** under `improvements/`
+describing the proposed change, targeting `main` for a maintainer to review and
+implement separately. **It never contains code changes** — this is enforced
+structurally (the PR creator only ever stages one regex-validated markdown path),
+so a prompt-injected session cannot smuggle code into a PR.
+
+PRs are opened via the [`gh` CLI](https://cli.github.com/), which must be
+installed and authenticated (`gh auth login`); the working tree must be clean.
+
+```json
+{
+  "improve": {
+    "enabled": true,
+    "baseBranch": "main",
+    "onSessionEnd": true
+  }
+}
+```
+
+The feature is **on by default**. Set `improve.enabled` to `false` (or export
+`TINY_CODE_IMPROVE=0`) to disable it entirely; set `onSessionEnd` to `false` to
+keep `/improve` but skip the automatic reflection at exit.
 
 ## Development
 
@@ -166,6 +264,52 @@ npm run build
 See `TODO.md` for the deferred-features backlog (sub-agents, web search, MCP,
 rich TUI, one-shot mode, conversation persistence).
 
+## Contributing
+
+Contributions are accepted from authorized contributors only, and are governed
+by the [License](#license) — by submitting a contribution you agree to those
+terms (including the assignment of rights in clause 4). This is **not** an
+open-source project: please do not fork, mirror, or redistribute the codebase
+(see the License).
+
+Workflow for an authorized change:
+
+1. Open an issue first to discuss the change and get sign-off from a maintainer.
+2. Branch from `main`, keep changes focused, and follow the existing code style.
+3. Before opening a PR, make sure the full check suite passes:
+
+   ```bash
+   npm run typecheck
+   npm run lint
+   npm test
+   npm run build
+   ```
+
+4. Add or update tests for any behavior change, and add a changeset
+   (`npx changeset`) when the change is user-facing.
+5. Open a PR targeting `main` for maintainer review.
+
+### Self-improvement workflow
+
+tiny-code can also propose its own improvements — a low-friction way to feed
+ideas back to maintainers without writing code. When a session ends (or when you
+run `/improve`), the agent reflects on the transcript for recurring friction
+(tool errors, repeated retries, denied permissions, missing capabilities) and,
+if it finds something concrete, asks permission to open a PR.
+
+That PR contains **only a single markdown file** under `improvements/`
+describing the proposed change — never code. This is enforced structurally (the
+PR creator only ever stages one regex-validated markdown path), so a
+prompt-injected session cannot smuggle code into a PR. A maintainer then reviews
+the proposal and implements it separately. See
+[Self-improvement](#self-improvement) above for configuration.
+
 ## License
 
-MIT
+**Proprietary — All Rights Reserved.** See [`LICENSE`](./LICENSE).
+
+You are granted a limited, revocable license to **install and use** tiny-code
+(e.g. via `npm install`) for your own internal or personal use. You may **not**
+fork, copy, modify, redistribute, resell, or offer it as a hosted service. It is
+free during the beta period; future versions may be offered under subscription
+or other paid terms.

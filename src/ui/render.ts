@@ -2,7 +2,7 @@ import pc from 'picocolors';
 import type { AgentUI } from '../agent/loop.js';
 import type { ToolResult } from '../tools/types.js';
 import type { Usage } from '../providers/types.js';
-import { estimateCost, formatUsd } from '../providers/pricing.js';
+import { getModelInfo, estimateCostUsd, formatUsd } from '../models/catalog.js';
 
 function preview(name: string, input: unknown): string {
   const obj = (input ?? {}) as Record<string, unknown>;
@@ -78,7 +78,8 @@ export function createTerminalUI(opts: TerminalUIOptions = {}): TerminalUI {
     onUsage(usage: Usage, model?: string) {
       totals.inputTokens += usage.inputTokens;
       totals.outputTokens += usage.outputTokens;
-      const cost = estimateCost(model ?? opts.model ?? '', usage);
+      const info = getModelInfo(model ?? opts.model ?? '');
+      const cost = info ? estimateCostUsd(usage, info) : null;
       if (cost !== null) totals.cost += cost;
 
       if (!showUsage) return;

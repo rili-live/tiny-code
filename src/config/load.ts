@@ -2,10 +2,13 @@ import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
+import type { Priority } from '../models/catalog.js';
+import { recommendModel } from '../models/catalog.js';
 
 export type Provider = 'anthropic' | 'gemini' | 'ollama';
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type Routing = 'local-first' | 'off';
+export type { Priority } from '../models/catalog.js';
 
 /** A frontier model to escalate heavy tasks to under local-first routing. */
 export interface EscalateTarget {
@@ -27,6 +30,8 @@ export interface AllowRules {
 export interface ResolvedConfig {
   provider: Provider;
   model: string;
+  /** Cost/performance bias used to auto-pick a model when none is pinned. */
+  priority: Priority;
   anthropicApiKey: string | undefined;
   geminiApiKey: string | undefined;
   /** OpenAI-compatible base URL for the Ollama provider. */
@@ -41,6 +46,17 @@ export interface ResolvedConfig {
   escalateTo: EscalateTarget | undefined;
   commandDirs: string[];
   allow: AllowRules;
+  improve: ImproveConfig;
+}
+
+/** Settings for the self-improvement / proposal-PR feature. */
+export interface ImproveConfig {
+  /** Master switch for the whole feature (manual and automatic). */
+  enabled: boolean;
+  /** Branch PRs target. */
+  baseBranch: string;
+  /** Whether to reflect automatically when the session ends. */
+  onSessionEnd: boolean;
 }
 
 export interface CliOverrides {
@@ -68,6 +84,7 @@ const FileConfigSchema = z
     provider: z.enum(['anthropic', 'gemini', 'ollama']).optional(),
     model: z.string().optional(),
     ollamaBaseUrl: z.string().url().optional(),
+    priority: z.enum(['performance', 'cost', 'balanced']).optional(),
     maxTokens: z.number().int().positive().optional(),
     thinking: z.boolean().optional(),
     effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
@@ -80,6 +97,13 @@ const FileConfigSchema = z
         tools: z.array(z.string()).optional(),
         bash: z.array(z.string()).optional(),
         write: z.array(z.string()).optional(),
+      })
+      .optional(),
+    improve: z
+      .object({
+        enabled: z.boolean().optional(),
+        baseBranch: z.string().optional(),
+        onSessionEnd: z.boolean().optional(),
       })
       .optional(),
   })
@@ -115,8 +139,17 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
     file.provider ??
     (anthropicApiKey ? 'anthropic' : geminiApiKey ? 'gemini' : 'anthropic');
 
+  const priority: Priority =
+    (env.TINY_CODE_PRIORITY as Priority | undefined) ?? file.priority ?? 'performance';
+
+  // When the user pins a model, honor it. Otherwise let the catalog pick the
+  // best fit for the cost/performance priority, falling back to a static
+  // default if the catalog has no entry for the provider.
+  const pinnedModel = overrides.model ?? env.TINY_CODE_MODEL ?? file.model;
   const model =
-    overrides.model ?? env.TINY_CODE_MODEL ?? file.model ?? DEFAULT_MODELS[provider];
+    pinnedModel ??
+    recommendModel({ provider, priority })?.id ??
+    DEFAULT_MODELS[provider];
 
   const maxTokens = env.TINY_CODE_MAX_TOKENS
     ? Number(env.TINY_CODE_MAX_TOKENS)
@@ -138,6 +171,7 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
   return {
     provider,
     model,
+    priority,
     anthropicApiKey,
     geminiApiKey,
     ollamaBaseUrl,
@@ -152,6 +186,16 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
       tools: file.allow?.tools ?? [],
       bash: file.allow?.bash ?? [],
       write: file.allow?.write ?? [],
+    },
+    improve: {
+      enabled:
+        env.TINY_CODE_IMPROVE === '0'
+          ? false
+          : env.TINY_CODE_IMPROVE === '1'
+            ? true
+            : (file.improve?.enabled ?? true),
+      baseBranch: file.improve?.baseBranch ?? 'main',
+      onSessionEnd: file.improve?.onSessionEnd ?? true,
     },
   };
 }

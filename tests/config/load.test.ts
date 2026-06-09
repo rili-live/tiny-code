@@ -9,9 +9,11 @@ const ENV_KEYS = [
   'GEMINI_API_KEY',
   'TINY_CODE_PROVIDER',
   'TINY_CODE_MODEL',
+  'TINY_CODE_PRIORITY',
   'TINY_CODE_MAX_TOKENS',
   'TINY_CODE_EFFORT',
   'TINY_CODE_OLLAMA_URL',
+  'TINY_CODE_IMPROVE',
   'HOME',
 ];
 
@@ -75,6 +77,65 @@ describe('loadConfig', () => {
     expect(cfg.effort).toBe('max');
     expect(cfg.allow.bash).toEqual(['npm test']);
     expect(cfg.allow.write).toEqual(['src/**']);
+  });
+
+  it('enables self-improvement by default', () => {
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.improve.enabled).toBe(true);
+    expect(cfg.improve.baseBranch).toBe('main');
+    expect(cfg.improve.onSessionEnd).toBe(true);
+  });
+
+  it('lets TINY_CODE_IMPROVE=0 disable the feature over a config file', async () => {
+    await writeFile(
+      join(cwd, 'tiny-code.config.json'),
+      JSON.stringify({ improve: { enabled: true } }),
+    );
+    process.env.TINY_CODE_IMPROVE = '0';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.improve.enabled).toBe(false);
+  });
+
+  it('reads improve settings from a config file', async () => {
+    await writeFile(
+      join(cwd, 'tiny-code.config.json'),
+      JSON.stringify({ improve: { enabled: false, baseBranch: 'develop', onSessionEnd: false } }),
+    );
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.improve.enabled).toBe(false);
+    expect(cfg.improve.baseBranch).toBe('develop');
+    expect(cfg.improve.onSessionEnd).toBe(false);
+  });
+
+  it('defaults to performance priority and the most capable model', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.priority).toBe('performance');
+    expect(cfg.model).toBe('claude-opus-4-8');
+  });
+
+  it('auto-selects a cheaper model when priority is cost', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.TINY_CODE_PRIORITY = 'cost';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.priority).toBe('cost');
+    expect(cfg.model).toBe('claude-haiku-4-5');
+  });
+
+  it('lets a pinned model win over the priority recommendation', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    const cfg = loadConfig({ model: 'claude-opus-4-8' }, cwd);
+    expect(cfg.priority).toBe('performance');
+    expect(cfg.model).toBe('claude-opus-4-8');
+  });
+
+  it('reads priority from a config file', async () => {
+    await writeFile(
+      join(cwd, 'tiny-code.config.json'),
+      JSON.stringify({ provider: 'gemini', priority: 'balanced' }),
+    );
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.priority).toBe('balanced');
   });
 
   it('lets env override the config file model', async () => {

@@ -19,9 +19,11 @@ Options:
   -h, --help          Show this help
 
 Environment:
-  ANTHROPIC_API_KEY   Required for the Anthropic provider
-  GEMINI_API_KEY      Required for the Gemini provider
-  TINY_CODE_OLLAMA_URL  Ollama OpenAI-compatible base URL (default http://localhost:11434/v1)
+  ANTHROPIC_API_KEY    Required for the Anthropic provider
+  GEMINI_API_KEY       Required for the Gemini provider
+  TINY_CODE_OLLAMA_URL Ollama OpenAI-compatible base URL (default http://localhost:11434/v1)
+  TINY_CODE_PRIORITY   performance | cost | balanced — auto-picks a model when
+                       none is pinned (default: performance)
 
 Cost-saving: set "routing": "local-first" with an "escalateTo" target in your
 config to run cheap/local models by default and escalate heavy tasks. Run /costs

@@ -259,6 +259,52 @@ describe('AgentLoop', () => {
     expect(events).not.toContain('route:anthropic:big:heavy task');
   });
 
+  it('accumulates token usage across a single turn', async () => {
+    const provider = new ScriptedProvider([
+      [
+        { type: 'text', delta: 'hi' },
+        { type: 'done', usage: { inputTokens: 10, outputTokens: 5 }, stopReason: 'end_turn' },
+      ],
+    ]);
+    const { ui } = recordingUI();
+    const loop = makeLoop(provider, ui, gateWith('yes'));
+    await loop.run('hello');
+    expect(loop.getUsage()).toEqual({ inputTokens: 10, outputTokens: 5 });
+  });
+
+  it('accumulates token usage across multiple run() calls', async () => {
+    const provider = new ScriptedProvider([
+      [{ type: 'done', usage: { inputTokens: 10, outputTokens: 5 }, stopReason: 'end_turn' }],
+      [{ type: 'done', usage: { inputTokens: 20, outputTokens: 8 }, stopReason: 'end_turn' }],
+    ]);
+    const { ui } = recordingUI();
+    const loop = makeLoop(provider, ui, gateWith('yes'));
+    await loop.run('first');
+    await loop.run('second');
+    expect(loop.getUsage()).toEqual({ inputTokens: 30, outputTokens: 13 });
+  });
+
+  it('clears conversation history but preserves session usage', async () => {
+    const provider = new ScriptedProvider([
+      [{ type: 'done', usage: { inputTokens: 10, outputTokens: 5 }, stopReason: 'end_turn' }],
+      [{ type: 'done', usage: { inputTokens: 20, outputTokens: 8 }, stopReason: 'end_turn' }],
+    ]);
+    const { ui } = recordingUI();
+    const loop = makeLoop(provider, ui, gateWith('yes'));
+
+    await loop.run('first');
+    expect(loop.getMessages().length).toBeGreaterThan(0);
+
+    loop.clearHistory();
+    expect(loop.getMessages()).toHaveLength(0);
+    expect(loop.getUsage()).toEqual({ inputTokens: 10, outputTokens: 5 });
+
+    // Next turn starts fresh: the request carries only the new user message.
+    await loop.run('second');
+    expect(provider.sent[1]!.messages).toHaveLength(1);
+    expect(loop.getUsage()).toEqual({ inputTokens: 30, outputTokens: 13 });
+  });
+
   it('stops at the iteration guard when tools never stop', async () => {
     const looping: ProviderEvent[][] = [];
     for (let i = 0; i < 10; i += 1) {
