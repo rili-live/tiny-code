@@ -48,4 +48,42 @@ describe('createTerminalUI', () => {
     expect(out).toContain('src/x.ts');
     expect(out).toContain('**/*.ts');
   });
+
+  it('shows a cost line for cloud models and accumulates session totals', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI({ model: 'claude-opus-4-8' });
+      ui.onUsage({ inputTokens: 1000, outputTokens: 1000 });
+      expect(ui.getTotals().inputTokens).toBe(1000);
+      expect(ui.getTotals().cost).toBeGreaterThan(0);
+    });
+    expect(out).toContain('1.0k in / 1.0k out');
+    expect(out).toContain('session');
+  });
+
+  it('labels local models as having no API cost', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI({ model: 'qwen2.5-coder:7b', provider: 'ollama' });
+      ui.onUsage({ inputTokens: 500, outputTokens: 200 });
+      expect(ui.getTotals().cost).toBe(0);
+    });
+    expect(out).toContain('local (no API cost)');
+  });
+
+  it('stays silent when showUsage is false but still tracks totals', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI({ model: 'claude-opus-4-8', showUsage: false });
+      ui.onUsage({ inputTokens: 100, outputTokens: 100 });
+      expect(ui.getTotals().inputTokens).toBe(100);
+    });
+    expect(out).toBe('');
+  });
+
+  it('renders an escalation route line', () => {
+    const out = capture(() => {
+      const ui = createTerminalUI();
+      ui.onRoute('anthropic', 'claude-opus-4-8', 'heavy task');
+    });
+    expect(out).toContain('escalated to anthropic:claude-opus-4-8');
+    expect(out).toContain('heavy task');
+  });
 });

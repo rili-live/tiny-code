@@ -4,6 +4,7 @@ import { AgentLoop } from '../../src/agent/loop.js';
 import type { AgentUI } from '../../src/agent/loop.js';
 import { createRegistry } from '../../src/tools/registry.js';
 import { defineTool } from '../../src/tools/types.js';
+import { escalateTool } from '../../src/tools/escalate.js';
 import { PermissionGate } from '../../src/permissions/gate.js';
 import type { PermissionChoice } from '../../src/permissions/gate.js';
 import type { ModelProvider, ProviderEvent, SendRequest } from '../../src/providers/types.js';
@@ -15,11 +16,18 @@ const DONE: ProviderEvent = {
 };
 
 class ScriptedProvider implements ModelProvider {
-  readonly name = 'anthropic' as const;
-  readonly model = 'fake';
+  readonly name: 'anthropic' | 'gemini' | 'ollama';
+  readonly model: string;
   readonly sent: SendRequest[] = [];
 
-  constructor(private readonly turns: ProviderEvent[][]) {}
+  constructor(
+    private readonly turns: ProviderEvent[][],
+    model = 'fake',
+    name: 'anthropic' | 'gemini' | 'ollama' = 'anthropic',
+  ) {
+    this.model = model;
+    this.name = name;
+  }
 
   async *send(req: SendRequest): AsyncIterable<ProviderEvent> {
     this.sent.push(req);
@@ -36,6 +44,7 @@ function recordingUI(): { ui: AgentUI; events: string[] } {
     onToolResult: (n, r) => events.push(`result:${n}:${r.output}:${r.isError ?? false}`),
     onToolDenied: (n) => events.push(`denied:${n}`),
     onUsage: () => events.push('usage'),
+    onRoute: (p, m, r) => events.push(`route:${p}:${m}:${r}`),
     onAssistantEnd: () => events.push('assistantEnd'),
     onMaxIterations: () => events.push('maxIter'),
   };
@@ -163,6 +172,91 @@ describe('AgentLoop', () => {
     if (result.type === 'tool_result') {
       expect(result.content).toContain('Unknown tool');
     }
+  });
+
+  it('routes a heavy turn to the escalation provider up front', async () => {
+    const local = new ScriptedProvider([[{ type: 'text', delta: 'local' }, DONE]], 'local');
+    const frontier = new ScriptedProvider(
+      [[{ type: 'text', delta: 'frontier' }, DONE]],
+      'big',
+      'anthropic',
+    );
+    const { ui, events } = recordingUI();
+    const loop = new AgentLoop({
+      provider: local,
+      registry,
+      gate: gateWith('yes'),
+      ui,
+      system: 'sys',
+      cwd: process.cwd(),
+      escalationProvider: frontier,
+      router: () => 'heavy',
+    });
+    await loop.run('refactor everything');
+
+    expect(frontier.sent).toHaveLength(1);
+    expect(local.sent).toHaveLength(0);
+    expect(events).toContain('route:anthropic:big:heavy task');
+  });
+
+  it('keeps a light turn on the local provider', async () => {
+    const local = new ScriptedProvider([[{ type: 'text', delta: 'local' }, DONE]], 'local');
+    const frontier = new ScriptedProvider([[DONE]], 'big');
+    const { ui, events } = recordingUI();
+    const loop = new AgentLoop({
+      provider: local,
+      registry,
+      gate: gateWith('yes'),
+      ui,
+      system: 'sys',
+      cwd: process.cwd(),
+      escalationProvider: frontier,
+      router: () => 'light',
+    });
+    await loop.run('list files');
+
+    expect(local.sent).toHaveLength(1);
+    expect(frontier.sent).toHaveLength(0);
+    expect(events).not.toContain('route:anthropic:big:heavy task');
+  });
+
+  it('escalates mid-turn when the local model calls the escalate tool', async () => {
+    const escalateRegistry = createRegistry([echoTool, escalateTool]);
+    const local = new ScriptedProvider(
+      [[{ type: 'tool_call', id: 'e1', name: 'escalate', input: { reason: 'too hard' } }, DONE]],
+      'local',
+    );
+    const frontier = new ScriptedProvider(
+      [[{ type: 'text', delta: 'handled' }, DONE]],
+      'big',
+      'anthropic',
+    );
+    const { ui, events } = recordingUI();
+    const loop = new AgentLoop({
+      provider: local,
+      registry: escalateRegistry,
+      gate: gateWith('yes'),
+      ui,
+      system: 'sys',
+      cwd: process.cwd(),
+      escalationProvider: frontier,
+      router: () => 'light',
+    });
+    await loop.run('start small then get stuck');
+
+    // First send on local, second (post-escalation) on frontier.
+    expect(local.sent).toHaveLength(1);
+    expect(frontier.sent).toHaveLength(1);
+    expect(events).toContain('route:anthropic:big:requested by model');
+    expect(events).toContain('text:handled');
+  });
+
+  it('behaves as a single provider when no escalation is configured', async () => {
+    const provider = new ScriptedProvider([[{ type: 'text', delta: 'hi' }, DONE]]);
+    const { ui, events } = recordingUI();
+    await makeLoop(provider, ui, gateWith('yes')).run('refactor the whole codebase');
+    expect(provider.sent).toHaveLength(1);
+    expect(events).not.toContain('route:anthropic:big:heavy task');
   });
 
   it('stops at the iteration guard when tools never stop', async () => {

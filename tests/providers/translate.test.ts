@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toAnthropicMessages } from '../../src/providers/anthropic.js';
 import { toGeminiContents } from '../../src/providers/gemini.js';
+import { toOpenAiMessages, toOpenAiTools } from '../../src/providers/ollama.js';
 import type { Message } from '../../src/agent/types.js';
 
 const conversation: Message[] = [
@@ -66,5 +67,27 @@ describe('toGeminiContents', () => {
   it('drops empty text parts', () => {
     const out = toGeminiContents([{ role: 'assistant', content: [{ type: 'text', text: '' }] }]);
     expect(out[0]!.parts).toHaveLength(0);
+  });
+});
+
+describe('toOpenAiMessages', () => {
+  it('maps roles and correlates tool results by tool_call_id', () => {
+    const out = toOpenAiMessages(conversation);
+
+    const assistant = out.find((m) => m.role === 'assistant')!;
+    expect(assistant.tool_calls?.[0]).toMatchObject({
+      id: 'call-1',
+      type: 'function',
+      function: { name: 'ls' },
+    });
+    expect(assistant.tool_calls?.[0]!.function.arguments).toBe(JSON.stringify({ path: '.' }));
+
+    const toolMsg = out.find((m) => m.role === 'tool')!;
+    expect(toolMsg).toMatchObject({ role: 'tool', tool_call_id: 'call-1', content: 'a.txt' });
+  });
+
+  it('produces a function tool array', () => {
+    const tools = toOpenAiTools([{ name: 'ls', description: 'list', jsonSchema: { type: 'object' } }]);
+    expect(tools[0]).toMatchObject({ type: 'function', function: { name: 'ls', description: 'list' } });
   });
 });

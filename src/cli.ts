@@ -12,8 +12,8 @@ Usage:
   tiny-code [options]
 
 Options:
-  --provider <name>   anthropic | gemini (default: inferred from API keys)
-  --model <id>        Model id override
+  --provider <name>   anthropic | gemini | ollama (default: inferred from API keys)
+  --model <id>        Model id override (e.g. claude-opus-4-8, gemma3:12b)
   --config <path>     Path to a config JSON file
   -v, --version       Print version
   -h, --help          Show this help
@@ -21,6 +21,11 @@ Options:
 Environment:
   ANTHROPIC_API_KEY   Required for the Anthropic provider
   GEMINI_API_KEY      Required for the Gemini provider
+  TINY_CODE_OLLAMA_URL  Ollama OpenAI-compatible base URL (default http://localhost:11434/v1)
+
+Cost-saving: set "routing": "local-first" with an "escalateTo" target in your
+config to run cheap/local models by default and escalate heavy tasks. Run /costs
+in the session for usage and tips.
 `;
 
 function main(): void {

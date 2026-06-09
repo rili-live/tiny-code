@@ -3,8 +3,16 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-export type Provider = 'anthropic' | 'gemini';
+export type Provider = 'anthropic' | 'gemini' | 'ollama';
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type Routing = 'local-first' | 'off';
+
+/** A frontier model to escalate heavy tasks to under local-first routing. */
+export interface EscalateTarget {
+  provider: Provider;
+  model: string;
+  ollamaBaseUrl?: string | undefined;
+}
 
 /** Auto-approval rules that bypass the interactive permission prompt. */
 export interface AllowRules {
@@ -21,10 +29,16 @@ export interface ResolvedConfig {
   model: string;
   anthropicApiKey: string | undefined;
   geminiApiKey: string | undefined;
+  /** OpenAI-compatible base URL for the Ollama provider. */
+  ollamaBaseUrl: string;
   maxTokens: number;
   thinking: boolean;
   effort: Effort;
   maxIterations: number;
+  /** 'local-first' starts turns on the cheap model and escalates heavy ones. */
+  routing: Routing;
+  /** Frontier model heavy tasks escalate to (only used when routing is 'local-first'). */
+  escalateTo: EscalateTarget | undefined;
   commandDirs: string[];
   allow: AllowRules;
 }
@@ -38,16 +52,28 @@ export interface CliOverrides {
 const DEFAULT_MODELS: Record<Provider, string> = {
   anthropic: 'claude-opus-4-8',
   gemini: 'gemini-2.5-pro',
+  ollama: 'qwen2.5-coder:7b',
 };
+
+const DEFAULT_OLLAMA_URL = 'http://localhost:11434/v1';
+
+const EscalateTargetSchema = z.object({
+  provider: z.enum(['anthropic', 'gemini', 'ollama']),
+  model: z.string(),
+  ollamaBaseUrl: z.string().url().optional(),
+});
 
 const FileConfigSchema = z
   .object({
-    provider: z.enum(['anthropic', 'gemini']).optional(),
+    provider: z.enum(['anthropic', 'gemini', 'ollama']).optional(),
     model: z.string().optional(),
+    ollamaBaseUrl: z.string().url().optional(),
     maxTokens: z.number().int().positive().optional(),
     thinking: z.boolean().optional(),
     effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
     maxIterations: z.number().int().positive().optional(),
+    routing: z.enum(['local-first', 'off']).optional(),
+    escalateTo: EscalateTargetSchema.optional(),
     commandDirs: z.array(z.string()).optional(),
     allow: z
       .object({
@@ -98,6 +124,12 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
 
   const effort = (env.TINY_CODE_EFFORT as Effort | undefined) ?? file.effort ?? 'high';
 
+  const ollamaBaseUrl = env.TINY_CODE_OLLAMA_URL ?? file.ollamaBaseUrl ?? DEFAULT_OLLAMA_URL;
+
+  const escalateTo = file.escalateTo;
+  // Default to local-first whenever an escalation target is configured.
+  const routing: Routing = file.routing ?? (escalateTo ? 'local-first' : 'off');
+
   const defaultCommandDirs = [
     join(cwd, '.agent', 'commands'),
     join(home, '.config', 'tiny-code', 'commands'),
@@ -108,10 +140,13 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
     model,
     anthropicApiKey,
     geminiApiKey,
+    ollamaBaseUrl,
     maxTokens,
     thinking: file.thinking ?? true,
     effort,
     maxIterations: file.maxIterations ?? 50,
+    routing,
+    escalateTo,
     commandDirs: file.commandDirs ?? defaultCommandDirs,
     allow: {
       tools: file.allow?.tools ?? [],

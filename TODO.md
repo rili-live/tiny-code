@@ -9,6 +9,19 @@ Explore/Plan agent). **Approach:** a `spawn_agent` tool whose `execute` construc
 a child `AgentLoop` with its own message history and a read-only tool subset,
 returning the child's final text. Keep depth at 1 to start.
 
+> Note: the cheap/expensive model split is now handled by **local-first
+> routing** (`routing: "local-first"` + `escalateTo`): turns start on the
+> local/cheap model and escalate to a frontier model when heavy or stuck (see
+> `src/agent/router.ts`, `src/tools/escalate.ts`, and the loop's escalation
+> logic). Sub-agents remain useful for *parallel* isolated runs.
+
+## More local-model interoperability
+Ollama is wired in via its OpenAI-compatible endpoint (`src/providers/ollama.ts`),
+which already covers LM Studio and vLLM (same wire format) by pointing
+`ollamaBaseUrl`/`TINY_CODE_OLLAMA_URL` at them. **Next:** an optional
+`/api/tags` probe to list locally-installed models and surface tokens/sec in the
+usage line; per-model context-window awareness for the RAM advisory.
+
 ## Web search / fetch
 Let the agent look up docs during a task. **Approach:** add `web_search` and
 `web_fetch` tools. For Anthropic, optionally delegate to the server-side

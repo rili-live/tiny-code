@@ -11,6 +11,7 @@ const ENV_KEYS = [
   'TINY_CODE_MODEL',
   'TINY_CODE_MAX_TOKENS',
   'TINY_CODE_EFFORT',
+  'TINY_CODE_OLLAMA_URL',
   'HOME',
 ];
 
@@ -84,5 +85,39 @@ describe('loadConfig', () => {
     process.env.TINY_CODE_MODEL = 'from-env';
     const cfg = loadConfig({}, cwd);
     expect(cfg.model).toBe('from-env');
+  });
+
+  it('supports the ollama provider with its default model and base URL', () => {
+    const cfg = loadConfig({ provider: 'ollama' }, cwd);
+    expect(cfg.provider).toBe('ollama');
+    expect(cfg.model).toBe('qwen2.5-coder:7b');
+    expect(cfg.ollamaBaseUrl).toBe('http://localhost:11434/v1');
+  });
+
+  it('honors TINY_CODE_OLLAMA_URL over the default', () => {
+    process.env.TINY_CODE_OLLAMA_URL = 'http://gpu-box:11434/v1';
+    const cfg = loadConfig({ provider: 'ollama' }, cwd);
+    expect(cfg.ollamaBaseUrl).toBe('http://gpu-box:11434/v1');
+  });
+
+  it('defaults routing to local-first when an escalateTo target is configured', async () => {
+    await writeFile(
+      join(cwd, 'tiny-code.config.json'),
+      JSON.stringify({
+        provider: 'ollama',
+        model: 'gemma3:12b',
+        escalateTo: { provider: 'anthropic', model: 'claude-opus-4-8' },
+      }),
+    );
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.routing).toBe('local-first');
+    expect(cfg.escalateTo).toEqual({ provider: 'anthropic', model: 'claude-opus-4-8' });
+  });
+
+  it('defaults routing to off with no escalateTo target', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.routing).toBe('off');
+    expect(cfg.escalateTo).toBeUndefined();
   });
 });

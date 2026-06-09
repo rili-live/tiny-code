@@ -8,19 +8,28 @@ export type { AgentUI, AgentLoopOptions } from './agent/loop.js';
 export { buildSystemPrompt } from './agent/systemPrompt.js';
 export type { SystemPromptParams } from './agent/systemPrompt.js';
 
-export { createProvider, AnthropicProvider, GeminiProvider } from './providers/index.js';
+export { createProvider, AnthropicProvider, GeminiProvider, OllamaProvider } from './providers/index.js';
 export type { ModelProvider, ProviderEvent, SendRequest, ToolSchema, Usage } from './providers/types.js';
+export { toOpenAiMessages, toOpenAiTools } from './providers/ollama.js';
+export { PRICING, estimateCost, formatUsd } from './providers/pricing.js';
+export type { ModelPricing } from './providers/pricing.js';
+
+export { classifyTurn } from './agent/router.js';
+export type { TaskWeight } from './agent/router.js';
+export { checkLocalModel, estimateModelRamGb, MODEL_RAM_GB } from './system/resources.js';
+export type { LocalModelCheck } from './system/resources.js';
 
 export { ALL_TOOLS, createRegistry, toJsonSchema } from './tools/registry.js';
 export type { ToolRegistry } from './tools/registry.js';
 export { defineTool } from './tools/types.js';
+export { escalateTool } from './tools/escalate.js';
 export type { Tool, ToolContext, ToolResult } from './tools/types.js';
 
 export { PermissionGate } from './permissions/gate.js';
 export type { PermissionPrompt, PermissionRequest, PermissionChoice } from './permissions/gate.js';
 
 export { loadConfig } from './config/load.js';
-export type { ResolvedConfig, CliOverrides, Provider, Effort, AllowRules } from './config/load.js';
+export type { ResolvedConfig, CliOverrides, Provider, Effort, AllowRules, Routing, EscalateTarget } from './config/load.js';
 export { loadProjectContext } from './config/context.js';
 
 export { loadCommands, renderCommand } from './commands/loader.js';

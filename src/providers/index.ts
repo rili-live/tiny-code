@@ -2,10 +2,12 @@ import type { ModelProvider } from './types.js';
 import type { ResolvedConfig } from '../config/load.js';
 import { AnthropicProvider } from './anthropic.js';
 import { GeminiProvider } from './gemini.js';
+import { OllamaProvider } from './ollama.js';
 
 export type { ModelProvider, ProviderEvent, SendRequest, ToolSchema, Usage } from './types.js';
 export { AnthropicProvider } from './anthropic.js';
 export { GeminiProvider } from './gemini.js';
+export { OllamaProvider } from './ollama.js';
 
 /** Construct the configured provider, validating that its API key is present. */
 export function createProvider(config: ResolvedConfig): ModelProvider {
@@ -20,6 +22,11 @@ export function createProvider(config: ResolvedConfig): ModelProvider {
       thinking: config.thinking,
       effort: config.effort,
     });
+  }
+
+  if (config.provider === 'ollama') {
+    // No API key required — Ollama runs locally.
+    return new OllamaProvider({ baseUrl: config.ollamaBaseUrl, model: config.model });
   }
 
   if (!config.geminiApiKey) {

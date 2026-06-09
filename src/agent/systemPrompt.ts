@@ -4,7 +4,11 @@ export interface SystemPromptParams {
   cwd: string;
   projectContext: string;
   tools: ToolSchema[];
+  /** When true, this model is the cheap/local model in a local-first setup. */
+  escalation?: boolean;
 }
+
+const ESCALATION_GUIDANCE = `Cost-aware routing: you are running as a fast, low-cost model. Handle routine work yourself — reading, searching, listing, and small, well-scoped edits. If a task needs deep reasoning, a large or multi-file refactor, tricky debugging, or you find yourself stuck or uncertain, call the \`escalate\` tool with a brief reason to hand off to a more capable model. Prefer escalating early over guessing.`;
 
 const BASE_PERSONA = `You are a precise, autonomous coding agent operating in a terminal.
 
@@ -24,6 +28,10 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
     `Working directory: ${params.cwd}`,
     `Available tools:\n${toolList}`,
   ];
+
+  if (params.escalation) {
+    sections.push(ESCALATION_GUIDANCE);
+  }
 
   if (params.projectContext.trim().length > 0) {
     sections.push(

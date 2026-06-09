@@ -1,6 +1,8 @@
 import pc from 'picocolors';
 import type { AgentUI } from '../agent/loop.js';
 import type { ToolResult } from '../tools/types.js';
+import type { Usage } from '../providers/types.js';
+import { estimateCost, formatUsd } from '../providers/pricing.js';
 
 function preview(name: string, input: unknown): string {
   const obj = (input ?? {}) as Record<string, unknown>;
@@ -15,9 +17,36 @@ function truncate(s: string, n: number): string {
   return oneLine.length > n ? `${oneLine.slice(0, n)}…` : oneLine;
 }
 
+/** Compact token count, e.g. 1234 -> "1.2k". */
+function fmtTokens(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+export interface SessionTotals {
+  inputTokens: number;
+  outputTokens: number;
+  /** Accumulated USD across priced (cloud) turns. */
+  cost: number;
+}
+
+export interface TerminalUI extends AgentUI {
+  /** Cumulative token + cost totals for the session (used by /costs). */
+  getTotals(): SessionTotals;
+}
+
+export interface TerminalUIOptions {
+  /** Default model id, used to price usage when the loop doesn't supply one. */
+  model?: string;
+  provider?: string;
+  /** Print the per-turn usage line. Default true; set false to stay silent. */
+  showUsage?: boolean;
+}
+
 /** Minimal streaming UI: assistant text inline, compact colored tool summaries. */
-export function createTerminalUI(): AgentUI {
+export function createTerminalUI(opts: TerminalUIOptions = {}): TerminalUI {
+  const showUsage = opts.showUsage ?? true;
   let atLineStart = true;
+  const totals: SessionTotals = { inputTokens: 0, outputTokens: 0, cost: 0 };
 
   const write = (s: string): void => {
     if (s.length === 0) return;
@@ -46,8 +75,24 @@ export function createTerminalUI(): AgentUI {
       ensureNewline();
       write(pc.yellow(`  ⊘ ${name} denied\n`));
     },
-    onUsage() {
-      // Token usage is available here; kept silent to reduce noise in the MVP.
+    onUsage(usage: Usage, model?: string) {
+      totals.inputTokens += usage.inputTokens;
+      totals.outputTokens += usage.outputTokens;
+      const cost = estimateCost(model ?? opts.model ?? '', usage);
+      if (cost !== null) totals.cost += cost;
+
+      if (!showUsage) return;
+      ensureNewline();
+      const tokens = `${fmtTokens(usage.inputTokens)} in / ${fmtTokens(usage.outputTokens)} out`;
+      const money =
+        cost !== null
+          ? `${formatUsd(cost)} turn · ${formatUsd(totals.cost)} session`
+          : 'local (no API cost)';
+      write(pc.dim(`· ${tokens} · ${money}\n`));
+    },
+    onRoute(provider, model, reason) {
+      ensureNewline();
+      write(pc.yellow(`↑ escalated to ${provider}:${model} (${reason})\n`));
     },
     onAssistantEnd() {
       ensureNewline();
@@ -55,6 +100,9 @@ export function createTerminalUI(): AgentUI {
     onMaxIterations() {
       ensureNewline();
       write(pc.yellow('[Reached max iterations — stopping]\n'));
+    },
+    getTotals() {
+      return { ...totals };
     },
   };
 }
