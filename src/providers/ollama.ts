@@ -7,6 +7,8 @@ export interface OllamaProviderOptions {
   model: string;
   /** Ignored by Ollama but required by the OpenAI wire format; defaults to "ollama". */
   apiKey?: string;
+  /** Cap on tokens to generate per response. Omitted from the request if unset. */
+  maxTokens?: number;
   /**
    * Abort the request if no bytes arrive for this long (ms). This is an *idle*
    * timeout, reset on every received chunk — a slow-but-progressing model keeps
@@ -96,12 +98,14 @@ export class OllamaProvider implements ModelProvider {
   readonly model: string;
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private readonly maxTokens: number | undefined;
   private readonly timeoutMs: number;
 
   constructor(opts: OllamaProviderOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
     this.model = opts.model;
     this.apiKey = opts.apiKey ?? 'ollama';
+    this.maxTokens = opts.maxTokens;
     this.timeoutMs = opts.timeoutMs ?? 120_000;
   }
 
@@ -116,6 +120,7 @@ export class OllamaProvider implements ModelProvider {
       messages,
       tools: req.tools.length > 0 ? toOpenAiTools(req.tools) : undefined,
       stream: true,
+      max_tokens: this.maxTokens,
     };
 
     // Idle-timeout guard: abort if the server goes silent for `timeoutMs`. The

@@ -99,6 +99,21 @@ describe('OllamaProvider.send', () => {
     expect(events.filter((e) => e.type === 'text').map((e) => (e as { delta: string }).delta).join('')).toBe('ok');
   });
 
+  it('forwards maxTokens as max_tokens, and omits it when unset', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(sseResponse([{ choices: [{ delta: { content: 'ok' } }] }]));
+
+    await collect(new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm', maxTokens: 256 }));
+    const capped = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(capped.max_tokens).toBe(256);
+
+    fetchMock.mockClear();
+    await collect(new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' }));
+    const uncapped = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(uncapped).not.toHaveProperty('max_tokens');
+  });
+
   it('throws a helpful error when Ollama is unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
     const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
