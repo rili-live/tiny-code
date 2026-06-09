@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { AgentLoop } from '../../src/agent/loop.js';
 import type { AgentUI } from '../../src/agent/loop.js';
+import { LocalFirstModelEngine } from '../../src/agent/decision/index.js';
 import { createRegistry } from '../../src/tools/registry.js';
 import { defineTool } from '../../src/tools/types.js';
 import { escalateTool } from '../../src/tools/escalate.js';
@@ -189,8 +190,7 @@ describe('AgentLoop', () => {
       ui,
       system: 'sys',
       cwd: process.cwd(),
-      escalationProvider: frontier,
-      router: () => 'heavy',
+      engine: new LocalFirstModelEngine({ primary: local, escalation: frontier, classify: () => 'heavy' }),
     });
     await loop.run('refactor everything');
 
@@ -210,8 +210,7 @@ describe('AgentLoop', () => {
       ui,
       system: 'sys',
       cwd: process.cwd(),
-      escalationProvider: frontier,
-      router: () => 'light',
+      engine: new LocalFirstModelEngine({ primary: local, escalation: frontier, classify: () => 'light' }),
     });
     await loop.run('list files');
 
@@ -239,8 +238,7 @@ describe('AgentLoop', () => {
       ui,
       system: 'sys',
       cwd: process.cwd(),
-      escalationProvider: frontier,
-      router: () => 'light',
+      engine: new LocalFirstModelEngine({ primary: local, escalation: frontier, classify: () => 'light' }),
     });
     await loop.run('start small then get stuck');
 
@@ -249,6 +247,32 @@ describe('AgentLoop', () => {
     expect(frontier.sent).toHaveLength(1);
     expect(events).toContain('route:anthropic:big:requested by model');
     expect(events).toContain('text:handled');
+  });
+
+  it('auto-escalates after the engine sees repeated tool errors (stuck)', async () => {
+    // Three iterations of a failing (unknown) tool trip the default stuck threshold.
+    const failing: ProviderEvent[][] = [];
+    for (let i = 0; i < 3; i += 1) {
+      failing.push([{ type: 'tool_call', id: `g${i}`, name: 'ghost', input: {} }, DONE]);
+    }
+    const local = new ScriptedProvider(failing, 'local');
+    const frontier = new ScriptedProvider([[{ type: 'text', delta: 'rescued' }, DONE]], 'big', 'anthropic');
+    const { ui, events } = recordingUI();
+    const loop = new AgentLoop({
+      provider: local,
+      registry,
+      gate: gateWith('yes'),
+      ui,
+      system: 'sys',
+      cwd: process.cwd(),
+      engine: new LocalFirstModelEngine({ primary: local, escalation: frontier, classify: () => 'light' }),
+    });
+    await loop.run('keep failing');
+
+    expect(local.sent).toHaveLength(3);
+    expect(frontier.sent).toHaveLength(1);
+    expect(events).toContain('route:anthropic:big:stuck — repeated tool errors');
+    expect(events).toContain('text:rescued');
   });
 
   it('behaves as a single provider when no escalation is configured', async () => {

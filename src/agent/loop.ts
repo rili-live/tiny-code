@@ -3,6 +3,7 @@ import type { ToolRegistry } from '../tools/registry.js';
 import type { PermissionGate } from '../permissions/gate.js';
 import type { ToolResult } from '../tools/types.js';
 import type { Message, ToolResultBlock, ToolUseBlock } from './types.js';
+import type { ModelDecisionEngine, RouteDecision } from './decision/index.js';
 
 /** Sink for everything the loop wants to surface. The REPL provides the real one. */
 export interface AgentUI {
@@ -26,14 +27,12 @@ export interface AgentLoopOptions {
   ui: AgentUI;
   cwd: string;
   maxIterations?: number;
-  /** Frontier model to escalate heavy/stuck turns to (enables local-first routing). */
-  escalationProvider?: ModelProvider | undefined;
-  /** Classifies a turn up front so heavy tasks start on the frontier model. */
-  router?: ((input: string) => 'light' | 'heavy') | undefined;
+  /**
+   * Owns model-selection policy (which model starts a turn, when to escalate).
+   * When omitted, the loop runs `provider` as a single provider with no routing.
+   */
+  engine?: ModelDecisionEngine | undefined;
 }
-
-/** Consecutive tool-error iterations before auto-escalating a stuck local model. */
-const STUCK_THRESHOLD = 3;
 
 /**
  * The provider-agnostic, UI-agnostic agentic loop: send → stream → run tools →
@@ -48,8 +47,7 @@ export class AgentLoop {
   private readonly ui: AgentUI;
   private readonly cwd: string;
   private readonly maxIterations: number;
-  private readonly escalationProvider: ModelProvider | undefined;
-  private readonly router: ((input: string) => 'light' | 'heavy') | undefined;
+  private readonly engine: ModelDecisionEngine | undefined;
   private readonly messages: Message[] = [];
 
   constructor(opts: AgentLoopOptions) {
@@ -60,8 +58,7 @@ export class AgentLoop {
     this.ui = opts.ui;
     this.cwd = opts.cwd;
     this.maxIterations = opts.maxIterations ?? 50;
-    this.escalationProvider = opts.escalationProvider;
-    this.router = opts.router;
+    this.engine = opts.engine;
   }
 
   /** Conversation history (for inspection / persistence). */
@@ -74,9 +71,15 @@ export class AgentLoop {
     this.messages.push({ role: 'user', content: [{ type: 'text', text: userInput }] });
     const tools = this.registry.toSchemas();
 
-    let active = this.selectInitialProvider(userInput);
-    let escalated = active === this.escalationProvider;
+    let active = this.provider;
+    let escalated = false;
     let consecutiveErrors = 0;
+
+    if (this.engine) {
+      const initial = this.engine.selectInitial(userInput);
+      active = this.applyRoute(active, initial);
+      escalated = active !== this.provider;
+    }
 
     for (let iteration = 0; iteration < this.maxIterations; iteration += 1) {
       let text = '';
@@ -106,11 +109,7 @@ export class AgentLoop {
 
       if (toolCalls.length === 0) return;
 
-      // The local model can explicitly hand off via the `escalate` tool.
-      if (!escalated && toolCalls.some((c) => c.name === 'escalate')) {
-        active = this.escalate('requested by model');
-        escalated = true;
-      }
+      const escalateRequested = toolCalls.some((c) => c.name === 'escalate');
 
       const results: ToolResultBlock[] = [];
       let anyError = false;
@@ -121,12 +120,20 @@ export class AgentLoop {
       }
       this.messages.push({ role: 'user', content: results });
 
-      // Auto-escalate a local model that appears stuck (repeated tool errors).
-      if (!escalated) {
-        consecutiveErrors = anyError ? consecutiveErrors + 1 : 0;
-        if (consecutiveErrors >= STUCK_THRESHOLD) {
-          active = this.escalate('stuck — repeated tool errors');
-          escalated = true;
+      // Hand the turn's runtime signals to the engine, which owns the policy
+      // for whether to switch providers mid-turn (explicit escalate, stuck, …).
+      consecutiveErrors = anyError ? consecutiveErrors + 1 : 0;
+      if (this.engine) {
+        const next = this.engine.considerEscalation({
+          escalateRequested,
+          consecutiveErrors,
+          alreadyEscalated: escalated,
+          current: active,
+          iteration,
+        });
+        if (next) {
+          active = this.applyRoute(active, next);
+          escalated = active !== this.provider;
         }
       }
     }
@@ -134,20 +141,15 @@ export class AgentLoop {
     this.ui.onMaxIterations();
   }
 
-  /** Pick the provider for a turn: heavy tasks start on the frontier model. */
-  private selectInitialProvider(input: string): ModelProvider {
-    if (this.escalationProvider && this.router && this.router(input) === 'heavy') {
-      this.ui.onRoute(this.escalationProvider.name, this.escalationProvider.model, 'heavy task');
-      return this.escalationProvider;
+  /**
+   * Apply a routing decision: switch to its provider and surface an `onRoute`
+   * event when it actually changes the active provider and carries a reason.
+   */
+  private applyRoute(active: ModelProvider, decision: RouteDecision): ModelProvider {
+    if (decision.provider !== active && decision.reason) {
+      this.ui.onRoute(decision.provider.name, decision.provider.model, decision.reason);
     }
-    return this.provider;
-  }
-
-  /** Switch to the frontier provider mid-turn. Falls back to the primary if unset. */
-  private escalate(reason: string): ModelProvider {
-    if (!this.escalationProvider) return this.provider;
-    this.ui.onRoute(this.escalationProvider.name, this.escalationProvider.model, reason);
-    return this.escalationProvider;
+    return decision.provider;
   }
 
   private async executeToolCall(call: ToolUseBlock): Promise<ToolResultBlock> {

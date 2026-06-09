@@ -16,6 +16,8 @@ export type { ModelPricing } from './providers/pricing.js';
 
 export { classifyTurn } from './agent/router.js';
 export type { TaskWeight } from './agent/router.js';
+export { LocalFirstModelEngine } from './agent/decision/index.js';
+export type { ModelDecisionEngine, RouteDecision, TurnSignals, LocalFirstOptions } from './agent/decision/index.js';
 export { checkLocalModel, estimateModelRamGb, MODEL_RAM_GB } from './system/resources.js';
 export type { LocalModelCheck } from './system/resources.js';
 

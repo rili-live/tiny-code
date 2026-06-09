@@ -8,7 +8,8 @@ import type { PermissionPrompt } from './permissions/gate.js';
 import { ALL_TOOLS, createRegistry } from './tools/registry.js';
 import { escalateTool } from './tools/escalate.js';
 import { createProvider } from './providers/index.js';
-import { classifyTurn } from './agent/router.js';
+import { LocalFirstModelEngine } from './agent/decision/index.js';
+import type { ModelDecisionEngine } from './agent/decision/index.js';
 import { formatUsd } from './providers/pricing.js';
 import { checkLocalModel } from './system/resources.js';
 import { loadConfig } from './config/load.js';
@@ -70,6 +71,12 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
       })
     : undefined;
 
+  // The decision engine owns all model-selection policy; the loop only runs it.
+  const engine: ModelDecisionEngine | undefined =
+    localFirst && escalationProvider
+      ? new LocalFirstModelEngine({ primary: provider, escalation: escalationProvider })
+      : undefined;
+
   const registry = createRegistry(localFirst ? [...ALL_TOOLS, escalateTool] : undefined);
   const projectContext = loadProjectContext(cwd);
   const system = buildSystemPrompt({
@@ -103,8 +110,7 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     ui,
     cwd,
     maxIterations: config.maxIterations,
-    escalationProvider,
-    router: localFirst ? classifyTurn : undefined,
+    engine,
   });
 
   const routeNote = localFirst
