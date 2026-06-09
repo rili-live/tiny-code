@@ -107,16 +107,15 @@ export class OllamaProvider implements ModelProvider {
       messages,
       tools: req.tools.length > 0 ? toOpenAiTools(req.tools) : undefined,
       stream: true,
-      stream_options: { include_usage: true },
     };
 
     let res: Response;
     try {
-      res = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.apiKey}` },
-        body: JSON.stringify(body),
-      });
+      // `stream_options.include_usage` is best-effort: it gives us token counts,
+      // but older Ollama builds reject unknown body fields with a 400. Rather than
+      // breaking every local turn over a reporting nicety, retry once without it.
+      res = await this.post({ ...body, stream_options: { include_usage: true } });
+      if (res.status === 400) res = await this.post(body);
     } catch (err) {
       throw new Error(
         `Cannot reach Ollama at ${this.baseUrl}. Is 'ollama serve' running? (${(err as Error).message})`,
@@ -170,6 +169,15 @@ export class OllamaProvider implements ModelProvider {
       usage,
       stopReason: calls.size > 0 ? 'tool_use' : finish,
     };
+  }
+
+  /** POST a chat-completions request body to the Ollama server. */
+  private post(body: unknown): Promise<Response> {
+    return fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.apiKey}` },
+      body: JSON.stringify(body),
+    });
   }
 }
 

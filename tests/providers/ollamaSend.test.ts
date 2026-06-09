@@ -82,6 +82,23 @@ describe('OllamaProvider.send', () => {
     expect(call).toMatchObject({ name: 'ls', input: {} });
   });
 
+  it('retries without stream_options when the server rejects it with a 400', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('unknown field "stream_options"', { status: 400 }))
+      .mockResolvedValueOnce(sseResponse([{ choices: [{ delta: { content: 'ok' } }] }]));
+
+    const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
+    const events = await collect(provider);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    const retryBody = JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string);
+    expect(firstBody.stream_options).toEqual({ include_usage: true });
+    expect(retryBody.stream_options).toBeUndefined();
+    expect(events.filter((e) => e.type === 'text').map((e) => (e as { delta: string }).delta).join('')).toBe('ok');
+  });
+
   it('throws a helpful error when Ollama is unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
     const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434/v1', model: 'm' });
