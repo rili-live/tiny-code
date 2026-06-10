@@ -61,6 +61,7 @@ shell commands) prompt for approval unless pre-approved in config.
 - `/costs` — session token usage, estimated $ cost, and cost-saving tips
 - `/clear` — clear the conversation history and start fresh
 - `/models` — show known models, pricing, and the active one (see below)
+- `/priority [performance|balanced|cost]` — show or switch the cost/performance priority mid-session; re-picks the auto-selected model unless one is pinned (see below)
 - `/improve` — reflect on the session and propose an improvement PR (see below)
 - `/<name> [args]` — run a custom command (see below)
 - `/exit` — quit
@@ -228,8 +229,10 @@ money and to pick a model that fits your cost/performance preference.
   { "priority": "performance" }
   ```
 
-  Or per-session with `TINY_CODE_PRIORITY=cost`. Pinning `model` (config, env,
-  or `--model`) always overrides the recommendation.
+  Or per-session with `TINY_CODE_PRIORITY=cost`, or on the fly with the
+  `/priority` command (e.g. `/priority performance` to jump to the most capable
+  model when a task gets hard, then `/priority balanced` to drop back). Pinning
+  `model` (config, env, or `--model`) always overrides the recommendation.
 
 The catalog is curated and offline (tiny-code has no live model-discovery yet —
 see `TODO.md`), so its prices carry an "as of" date; keep it current as vendors

@@ -30,6 +30,9 @@ export interface AllowRules {
 export interface ResolvedConfig {
   provider: Provider;
   model: string;
+  /** True when `model` was explicitly pinned (CLI/env/config), so changing
+   *  `priority` shouldn't re-pick it. */
+  modelPinned: boolean;
   /** Cost/performance bias used to auto-pick a model when none is pinned. */
   priority: Priority;
   anthropicApiKey: string | undefined;
@@ -195,6 +198,7 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
   return {
     provider,
     model,
+    modelPinned: pinnedModel !== undefined,
     priority,
     anthropicApiKey,
     geminiApiKey,

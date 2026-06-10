@@ -13,7 +13,7 @@ import { LocalFirstModelEngine } from './agent/decision/index.js';
 import type { ModelDecisionEngine } from './agent/decision/index.js';
 import { checkLocalModel } from './system/resources.js';
 import { loadConfig } from './config/load.js';
-import type { CliOverrides, ResolvedConfig } from './config/load.js';
+import type { CliOverrides, ResolvedConfig, Priority } from './config/load.js';
 import { loadProjectContext } from './config/context.js';
 import { buildSystemPrompt } from './agent/systemPrompt.js';
 import { loadCommands, renderCommand } from './commands/loader.js';
@@ -26,6 +26,7 @@ import {
   estimateCostUsd,
   formatUsd,
   blendedCostPerMTok,
+  recommendModel,
 } from './models/catalog.js';
 import type { Usage } from './providers/types.js';
 import { getUpdateNotice, maybeRefreshUpdateCache, formatUpdateNotice } from './system/updateCheck.js';
@@ -61,6 +62,7 @@ function printHelp(commands: Map<string, Command>): void {
   console.log('  /costs           Show token usage, est. cost, and cost-saving tips');
   console.log('  /clear           Clear the conversation history and start fresh');
   console.log('  /models          Show known models, pricing, and the active one');
+  console.log('  /priority        Show or switch the cost/performance priority (e.g. /priority performance)');
   console.log('  /improve         Reflect on this session and propose an improvement PR');
   console.log('  /exit, /quit     Leave the session');
   if (commands.size > 0) {
@@ -154,7 +156,7 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     });
 
   const gate = new PermissionGate(config.allow, prompt);
-  const modelInfo = getModelInfo(config.model);
+  let modelInfo = getModelInfo(config.model);
   const ui = createTerminalUI({ model: provider.model, provider: provider.name });
   const agent = new AgentLoop({
     provider,
@@ -247,6 +249,51 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
   }
   console.log(pc.dim('Type a request, /help for commands, /costs for usage, /exit to quit.'));
 
+  const PRIORITIES: Priority[] = ['performance', 'balanced', 'cost'];
+
+  const printPriority = (): void => {
+    console.log(pc.bold('\nPriority: ') + config.priority + pc.dim(`  (active model: ${config.model})`));
+    console.log(pc.dim('  performance  most capable model, ignoring price'));
+    console.log(pc.dim('  balanced     best capability-per-dollar (default)'));
+    console.log(pc.dim('  cost         cheapest still-capable model'));
+    console.log(pc.dim('Switch with: /priority performance | balanced | cost'));
+  };
+
+  // Change the auto-selection priority mid-session and re-pick the model when
+  // appropriate. Pinned models and local-first routing govern the model
+  // themselves, so there we just record the new priority.
+  const setPriority = (priority: Priority): void => {
+    if (priority === config.priority) {
+      console.log(pc.dim(`Priority already ${priority}.`));
+      return;
+    }
+    config.priority = priority;
+
+    if (config.modelPinned) {
+      console.log(pc.dim(`Priority → ${priority}. Model ${config.model} is pinned, so it stays.`));
+      return;
+    }
+    if (localFirst) {
+      console.log(
+        pc.dim(`Priority → ${priority}. Local-first routing picks the model; this applies if routing is off.`),
+      );
+      return;
+    }
+    const picked = recommendModel({ provider: config.provider, priority });
+    if (!picked || picked.id === config.model) {
+      console.log(pc.dim(`Priority → ${priority}. Model unchanged (${config.model}).`));
+      return;
+    }
+    const prevModel = config.model;
+    config.model = picked.id;
+    modelInfo = getModelInfo(picked.id);
+    agent.setProvider(createProvider(config));
+    console.log(
+      pc.cyan(`Priority → ${priority}.`) +
+        pc.dim(` Model ${prevModel} → ${picked.id} ($${picked.inputPricePerMTok}/$${picked.outputPricePerMTok} per 1M in/out).`),
+    );
+  };
+
   const handle = async (line: string): Promise<void> => {
     const input = line.trim();
     if (input.length === 0) {
@@ -276,6 +323,18 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     }
     if (input === '/models') {
       printModels(config.model, config.priority, agent.getUsage());
+      ask();
+      return;
+    }
+    if (input === '/priority' || input.startsWith('/priority ')) {
+      const arg = input.slice('/priority'.length).trim().toLowerCase();
+      if (arg.length === 0) {
+        printPriority();
+      } else if ((PRIORITIES as string[]).includes(arg)) {
+        setPriority(arg as Priority);
+      } else {
+        console.log(pc.red(`Unknown priority: ${arg} (use performance, balanced, or cost)`));
+      }
       ask();
       return;
     }

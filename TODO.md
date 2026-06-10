@@ -17,6 +17,20 @@ a single condensed block. For Anthropic use the compaction beta; for Gemini
 summarize via a lightweight call to a cheap model. Pair with conversation
 persistence so compacted sessions can be resumed.
 
+## On-the-fly provider switching
+The `/priority` command already swaps the active *model* within the current
+provider mid-session (`AgentLoop.setProvider`). Extend this to switch the
+*provider* too, so a session can move between Anthropic, Gemini, DeepSeek, Qwen,
+and Ollama without restarting. **Approach:** a `/provider <name> [model]`
+command that validates the target's API key (reuse `createProvider`'s checks),
+re-resolves the model (honoring `priority` and any pin), rebuilds the provider,
+and calls `agent.setProvider`. Decide how it interacts with local-first routing
+(switching the primary vs. the `escalateTo` target) and keep `/costs` accurate
+across providers — usage is already priced per-turn from the active model, so the
+running total stays correct; just refresh the session-end summary's model.
+Consider a single `/model <id>` shortcut that infers the provider from the
+catalog entry.
+
 ## Sub-agents
 Spawn isolated agent runs for parallel exploration/research (like a lightweight
 Explore/Plan agent). **Approach:** a `spawn_agent` tool whose `execute` constructs

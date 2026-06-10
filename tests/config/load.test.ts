@@ -120,6 +120,12 @@ describe('loadConfig', () => {
     expect(cfg.model).toBe('claude-sonnet-4-6');
   });
 
+  it('flags whether the model was pinned', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    expect(loadConfig({}, cwd).modelPinned).toBe(false);
+    expect(loadConfig({ model: 'claude-opus-4-8' }, cwd).modelPinned).toBe(true);
+  });
+
   it('opts into the most capable model with performance priority', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     process.env.TINY_CODE_PRIORITY = 'performance';
