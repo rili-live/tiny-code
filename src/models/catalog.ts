@@ -32,7 +32,7 @@ export interface ModelInfo {
  * from the bundled claude-api reference; Gemini figures from Google's published
  * API pricing.
  */
-export const CATALOG_AS_OF = '2026-06-08';
+export const CATALOG_AS_OF = '2026-06-10';
 
 /**
  * The known coding models, newest/most-capable first within each provider.
@@ -51,6 +51,15 @@ export const MODEL_CATALOG: ModelInfo[] = [
   { id: 'gemini-2.5-pro', provider: 'gemini', label: 'Gemini 2.5 Pro', inputPricePerMTok: 1.25, outputPricePerMTok: 10, contextWindow: 1_048_576, codingScore: 90 },
   { id: 'gemini-2.5-flash', provider: 'gemini', label: 'Gemini 2.5 Flash', inputPricePerMTok: 0.3, outputPricePerMTok: 2.5, contextWindow: 1_048_576, codingScore: 72 },
   { id: 'gemini-2.5-flash-lite', provider: 'gemini', label: 'Gemini 2.5 Flash-Lite', inputPricePerMTok: 0.1, outputPricePerMTok: 0.4, contextWindow: 1_048_576, codingScore: 55 },
+
+  // OpenAI — pricing from OpenAI's published API rates (June 2026).
+  { id: 'o3', provider: 'openai', label: 'OpenAI o3', inputPricePerMTok: 2, outputPricePerMTok: 8, contextWindow: 200_000, codingScore: 94 },
+  { id: 'gpt-4.1', provider: 'openai', label: 'GPT-4.1', inputPricePerMTok: 2, outputPricePerMTok: 8, contextWindow: 1_000_000, codingScore: 88 },
+  { id: 'o4-mini', provider: 'openai', label: 'OpenAI o4-mini', inputPricePerMTok: 1.1, outputPricePerMTok: 4.4, contextWindow: 200_000, codingScore: 85 },
+  { id: 'gpt-4o', provider: 'openai', label: 'GPT-4o', inputPricePerMTok: 2.5, outputPricePerMTok: 10, contextWindow: 128_000, codingScore: 82 },
+  { id: 'gpt-4.1-mini', provider: 'openai', label: 'GPT-4.1 Mini', inputPricePerMTok: 0.4, outputPricePerMTok: 1.6, contextWindow: 1_000_000, codingScore: 72 },
+  { id: 'gpt-4o-mini', provider: 'openai', label: 'GPT-4o Mini', inputPricePerMTok: 0.15, outputPricePerMTok: 0.6, contextWindow: 128_000, codingScore: 65 },
+  { id: 'gpt-4.1-nano', provider: 'openai', label: 'GPT-4.1 Nano', inputPricePerMTok: 0.1, outputPricePerMTok: 0.4, contextWindow: 1_000_000, codingScore: 50 },
 ];
 
 /** Look up catalog facts for a model id, or `undefined` if it's not tracked. */

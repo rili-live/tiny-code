@@ -3,11 +3,13 @@ import type { ResolvedConfig } from '../config/load.js';
 import { AnthropicProvider } from './anthropic.js';
 import { GeminiProvider } from './gemini.js';
 import { OllamaProvider } from './ollama.js';
+import { OpenAIProvider } from './openai.js';
 
 export type { ModelProvider, ProviderEvent, SendRequest, ToolSchema, Usage } from './types.js';
 export { AnthropicProvider } from './anthropic.js';
 export { GeminiProvider } from './gemini.js';
 export { OllamaProvider } from './ollama.js';
+export { OpenAIProvider } from './openai.js';
 
 /** Construct the configured provider, validating that its API key is present. */
 export function createProvider(config: ResolvedConfig): ModelProvider {
@@ -30,6 +32,18 @@ export function createProvider(config: ResolvedConfig): ModelProvider {
       baseUrl: config.ollamaBaseUrl,
       model: config.model,
       maxTokens: config.maxTokens,
+    });
+  }
+
+  if (config.provider === 'openai') {
+    if (!config.openaiApiKey) {
+      throw new Error('OPENAI_API_KEY is not set. Export it or switch providers with --provider anthropic.');
+    }
+    return new OpenAIProvider({
+      apiKey: config.openaiApiKey,
+      model: config.model,
+      maxTokens: config.maxTokens,
+      baseUrl: config.openaiBaseUrl,
     });
   }
 
