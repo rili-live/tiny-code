@@ -17,7 +17,7 @@ export interface OpenAiCompatibleOptions {
   timeoutMs?: number;
 }
 
-interface OpenAiMessage {
+export interface OpenAiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[];
@@ -126,13 +126,7 @@ export abstract class OpenAiCompatibleProvider implements ModelProvider {
       ...toOpenAiMessages(req.messages),
     ];
 
-    const body = {
-      model: this.model,
-      messages,
-      tools: req.tools.length > 0 ? toOpenAiTools(req.tools) : undefined,
-      stream: true,
-      max_tokens: this.maxTokens,
-    };
+    const body = this.buildBody(messages, req);
 
     // Idle-timeout guard: abort if the server goes silent for `timeoutMs`. The
     // raw fetch (unlike the cloud SDKs) has no built-in timeout, so without this
@@ -214,6 +208,22 @@ export abstract class OpenAiCompatibleProvider implements ModelProvider {
     } finally {
       clearTimeout(timer!);
     }
+  }
+
+  /**
+   * Build the `/chat/completions` request body. Subclasses override to adjust
+   * provider-specific fields — e.g. OpenAI's hosted API requires
+   * `max_completion_tokens` rather than `max_tokens`. `stream_options` is added
+   * by {@link send} (with a no-`stream_options` retry), so it isn't set here.
+   */
+  protected buildBody(messages: OpenAiMessage[], req: SendRequest): Record<string, unknown> {
+    return {
+      model: this.model,
+      messages,
+      tools: req.tools.length > 0 ? toOpenAiTools(req.tools) : undefined,
+      stream: true,
+      max_tokens: this.maxTokens,
+    };
   }
 
   /** Human-readable provider name used in error messages. */

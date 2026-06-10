@@ -1,7 +1,7 @@
 {
   "name": "@therr/tiny-code",
   "version": "0.2.3",
-  "description": "A small, extensible CLI coding agent with interchangeable Anthropic and Gemini models.",
+  "description": "A small, extensible CLI coding agent with interchangeable Anthropic, Gemini, OpenAI, DeepSeek, Qwen, and local (Ollama) models.",
   "type": "module",
   "bin": {
     "tiny-code": "dist/cli.js"
@@ -54,6 +54,11 @@
     "anthropic",
     "claude",
     "gemini",
+    "openai",
+    "deepseek",
+    "qwen",
+    "ollama",
+    "local-llm",
     "llm"
   ],
   "license": "SEE LICENSE IN LICENSE",

@@ -11,7 +11,7 @@ Run cheap, open-weight models locally and **escalate heavy work to a frontier
 model only when needed** — see [Local models & cost-aware routing](#local-models--cost-aware-routing).
 
 > Status: early (v0.x). Published as `@therr/tiny-code`; the binary is
-> `tiny-code`. Names may change before the first npm publish.
+> `tiny-code`. APIs and config may still change between minor versions.
 
 ## Install
 
