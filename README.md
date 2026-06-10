@@ -3,15 +3,15 @@
 A small, extensible CLI coding agent built around one constraint: **keep token
 usage low**. As coding-agent costs climb, tiny-code automates the savings so
 you don't have to. Interactive terminal REPL, interchangeable **Anthropic**,
-**Gemini**, **DeepSeek**, **Qwen Coder**, and **local (Ollama)** models, and just
-the core features you actually use: read/write/edit files, run shell commands,
+**Gemini**, **OpenAI**, **DeepSeek**, **Qwen Coder**, and **local (Ollama)** models,
+and just the core features you actually use: read/write/edit files, run shell commands,
 search code, and a custom commands/skills system. No business logic baked in.
 
 Run cheap, open-weight models locally and **escalate heavy work to a frontier
 model only when needed** — see [Local models & cost-aware routing](#local-models--cost-aware-routing).
 
 > Status: early (v0.x). Published as `@therr/tiny-code`; the binary is
-> `tiny-code`. Names may change before the first npm publish.
+> `tiny-code`. APIs and config may still change between minor versions.
 
 ## Install
 
@@ -30,18 +30,20 @@ node dist/cli.js
 ## Setup
 
 Provide at least one API key. If several are set, the default is the first
-available in this order: Anthropic, Gemini, DeepSeek, Qwen.
+available in this order: Anthropic, Gemini, OpenAI, DeepSeek, Qwen.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export GEMINI_API_KEY=...
+export OPENAI_API_KEY=sk-...
 export DEEPSEEK_API_KEY=sk-...
 export QWEN_API_KEY=sk-...        # Alibaba DashScope key (DASHSCOPE_API_KEY also works)
 ```
 
-DeepSeek and Qwen are hosted, OpenAI-compatible coding models. Override their
-endpoints with `TINY_CODE_DEEPSEEK_URL` / `TINY_CODE_QWEN_URL` (or `deepseekBaseUrl`
-/ `qwenBaseUrl` in config) — e.g. to point Qwen at the international DashScope host.
+OpenAI, DeepSeek, and Qwen are hosted, OpenAI-compatible models. Override their
+endpoints with `TINY_CODE_OPENAI_URL` (e.g. for Azure OpenAI), `TINY_CODE_DEEPSEEK_URL`,
+or `TINY_CODE_QWEN_URL` (or `openaiBaseUrl` / `deepseekBaseUrl` / `qwenBaseUrl` in config)
+— e.g. to point Qwen at the international DashScope host.
 
 ## Usage
 
@@ -49,6 +51,7 @@ endpoints with `TINY_CODE_DEEPSEEK_URL` / `TINY_CODE_QWEN_URL` (or `deepseekBase
 tiny-code                       # start the REPL (uses an available key)
 tiny-code --provider gemini     # force a provider
 tiny-code --model claude-opus-4-8
+tiny-code --provider openai --model gpt-4.1                # OpenAI (also o3, o4-mini, …)
 tiny-code --provider deepseek --model deepseek-v4-pro     # DeepSeek's coding model
 tiny-code --provider qwen --model qwen3-coder-plus        # Qwen Coder
 tiny-code --provider ollama --model gemma3:12b   # run a local model (no API cost)
