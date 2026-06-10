@@ -3,9 +3,9 @@
 A small, extensible CLI coding agent built around one constraint: **keep token
 usage low**. As coding-agent costs climb, tiny-code automates the savings so
 you don't have to. Interactive terminal REPL, interchangeable **Anthropic**,
-**Gemini**, and **local (Ollama)** models, and just the core features you
-actually use: read/write/edit files, run shell commands, search code, and a
-custom commands/skills system. No business logic baked in.
+**Gemini**, **DeepSeek**, **Qwen Coder**, and **local (Ollama)** models, and just
+the core features you actually use: read/write/edit files, run shell commands,
+search code, and a custom commands/skills system. No business logic baked in.
 
 Run cheap, open-weight models locally and **escalate heavy work to a frontier
 model only when needed** — see [Local models & cost-aware routing](#local-models--cost-aware-routing).
@@ -29,12 +29,19 @@ node dist/cli.js
 
 ## Setup
 
-Provide at least one API key. If both are set, Anthropic is used by default.
+Provide at least one API key. If several are set, the default is the first
+available in this order: Anthropic, Gemini, DeepSeek, Qwen.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export GEMINI_API_KEY=...
+export DEEPSEEK_API_KEY=sk-...
+export QWEN_API_KEY=sk-...        # Alibaba DashScope key (DASHSCOPE_API_KEY also works)
 ```
+
+DeepSeek and Qwen are hosted, OpenAI-compatible coding models. Override their
+endpoints with `TINY_CODE_DEEPSEEK_URL` / `TINY_CODE_QWEN_URL` (or `deepseekBaseUrl`
+/ `qwenBaseUrl` in config) — e.g. to point Qwen at the international DashScope host.
 
 ## Usage
 
@@ -42,6 +49,8 @@ export GEMINI_API_KEY=...
 tiny-code                       # start the REPL (uses an available key)
 tiny-code --provider gemini     # force a provider
 tiny-code --model claude-opus-4-8
+tiny-code --provider deepseek --model deepseek-v4-pro     # DeepSeek's coding model
+tiny-code --provider qwen --model qwen3-coder-plus        # Qwen Coder
 tiny-code --provider ollama --model gemma3:12b   # run a local model (no API cost)
 ```
 
@@ -52,6 +61,7 @@ shell commands) prompt for approval unless pre-approved in config.
 - `/costs` — session token usage, estimated $ cost, and cost-saving tips
 - `/clear` — clear the conversation history and start fresh
 - `/models` — show known models, pricing, and the active one (see below)
+- `/priority [performance|balanced|cost]` — show or switch the cost/performance priority mid-session; re-picks the auto-selected model unless one is pinned (see below)
 - `/improve` — reflect on the session and propose an improvement PR (see below)
 - `/<name> [args]` — run a custom command (see below)
 - `/exit` — quit
@@ -133,7 +143,7 @@ CLI flags.
   "provider": "anthropic",
   "model": "claude-opus-4-8",
   "ollamaBaseUrl": "http://localhost:11434/v1",
-  "priority": "performance",
+  "priority": "balanced",
   "maxTokens": 16000,
   "thinking": true,
   "effort": "high",
@@ -154,7 +164,8 @@ CLI flags.
 `routing: "local-first"` plus `escalateTo` enables cost-aware routing (see
 [above](#local-models--cost-aware-routing)); it defaults to `local-first`
 automatically whenever `escalateTo` is present. `ollamaBaseUrl` points at your
-Ollama server's OpenAI-compatible endpoint.
+Ollama server's OpenAI-compatible endpoint; `deepseekBaseUrl` / `qwenBaseUrl`
+override the DeepSeek and Qwen (DashScope) endpoints.
 
 Approximate cloud pricing used for the `/costs` estimate lives in the model
 catalog (`src/models/catalog.ts`) — edit it to match current vendor rates.
@@ -203,18 +214,25 @@ money and to pick a model that fits your cost/performance preference.
 - **Priority-driven selection.** When you don't pin a `model`, tiny-code picks
   one for you based on `priority`:
 
-  | `priority`      | Picks                                                        |
-  | --------------- | ----------------------------------------------------------- |
-  | `performance`   | The most capable model (the default — current behavior).    |
-  | `cost`          | The cheapest still-capable model.                           |
-  | `balanced`      | The best capability-per-dollar among capable models.        |
+  | `priority`      | Picks                                                            |
+  | --------------- | --------------------------------------------------------------- |
+  | `balanced`      | The best capability-per-dollar among capable models (default).  |
+  | `performance`   | The most capable model, ignoring price.                         |
+  | `cost`          | The cheapest still-capable model.                               |
+
+  `balanced` is the default: it ranks capable models by
+  `codingScore / blendedCostPerMTok` (a model's coding aptitude per blended
+  dollar, weighting input 80% / output 20%) behind a quality floor, so you get
+  strong-but-sensibly-priced models without opting in.
 
   ```json
-  { "priority": "balanced" }
+  { "priority": "performance" }
   ```
 
-  Or per-session with `TINY_CODE_PRIORITY=cost`. Pinning `model` (config, env,
-  or `--model`) always overrides the recommendation.
+  Or per-session with `TINY_CODE_PRIORITY=cost`, or on the fly with the
+  `/priority` command (e.g. `/priority performance` to jump to the most capable
+  model when a task gets hard, then `/priority balanced` to drop back). Pinning
+  `model` (config, env, or `--model`) always overrides the recommendation.
 
 The catalog is curated and offline (tiny-code has no live model-discovery yet —
 see `TODO.md`), so its prices carry an "as of" date; keep it current as vendors

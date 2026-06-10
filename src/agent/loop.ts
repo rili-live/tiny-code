@@ -51,7 +51,7 @@ export interface AgentLoopOptions {
  * iteration guard trips). Conversation state persists across `run` calls.
  */
 export class AgentLoop {
-  private readonly provider: ModelProvider;
+  private provider: ModelProvider;
   private readonly registry: ToolRegistry;
   private readonly gate: PermissionGate;
   private readonly system: string;
@@ -84,6 +84,16 @@ export class AgentLoop {
   /** Conversation history (for inspection / persistence). */
   getMessages(): readonly Message[] {
     return this.messages;
+  }
+
+  /**
+   * Swap the base provider mid-session — e.g. when the user changes the active
+   * model via `/priority`. Only affects un-escalated turns; if the session has
+   * stuck to an escalated frontier provider, that takes precedence until
+   * `clearHistory()` resets routing.
+   */
+  setProvider(provider: ModelProvider): void {
+    this.provider = provider;
   }
 
   /** Drop the conversation history so the next turn starts fresh. Cumulative

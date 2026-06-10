@@ -367,6 +367,22 @@ describe('AgentLoop', () => {
     expect(loop.getUsage()).toEqual({ inputTokens: 30, outputTokens: 13 });
   });
 
+  it('routes later turns to a provider swapped in via setProvider', async () => {
+    const first = new ScriptedProvider([[{ type: 'text', delta: 'a' }, DONE]], 'model-a');
+    const second = new ScriptedProvider([[{ type: 'text', delta: 'b' }, DONE]], 'model-b');
+    const { ui } = recordingUI();
+    const loop = makeLoop(first, ui, gateWith('yes'));
+
+    await loop.run('one');
+    expect(first.sent).toHaveLength(1);
+
+    loop.setProvider(second);
+    await loop.run('two');
+    // The swapped-in provider handles the new turn; the old one is untouched.
+    expect(first.sent).toHaveLength(1);
+    expect(second.sent).toHaveLength(1);
+  });
+
   it('stops at the iteration guard when tools never stop', async () => {
     const looping: ProviderEvent[][] = [];
     for (let i = 0; i < 10; i += 1) {
