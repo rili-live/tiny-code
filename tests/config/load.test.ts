@@ -126,6 +126,22 @@ describe('loadConfig', () => {
     expect(loadConfig({ model: 'claude-opus-4-8' }, cwd).modelPinned).toBe(true);
   });
 
+  it('ignores an invalid TINY_CODE_PRIORITY instead of silently mis-picking a model', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.TINY_CODE_PRIORITY = 'performant'; // typo
+    const cfg = loadConfig({}, cwd);
+    // Falls back to the default priority + its model, not an arbitrary catalog entry.
+    expect(cfg.priority).toBe('balanced');
+    expect(cfg.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('ignores an invalid TINY_CODE_PROVIDER and falls back to key inference', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.TINY_CODE_PROVIDER = 'mistral'; // unsupported
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('anthropic');
+  });
+
   it('opts into the most capable model with performance priority', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     process.env.TINY_CODE_PRIORITY = 'performance';

@@ -85,6 +85,27 @@ const DEFAULT_MODELS: Record<Provider, string> = {
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434/v1';
 
 const PROVIDERS = ['anthropic', 'gemini', 'ollama', 'deepseek', 'qwen'] as const;
+const PRIORITIES = ['performance', 'cost', 'balanced'] as const;
+
+/**
+ * Read an env var constrained to a known set. An unrecognized value is ignored
+ * (with a warning) rather than cast through blindly: an unchecked cast lets a
+ * typo like `TINY_CODE_PRIORITY=performant` fall through `recommendModel` and
+ * silently pick an unintended model. Returns `undefined` so resolution falls
+ * back to the next source in precedence.
+ */
+function readEnvEnum<T extends string>(
+  name: string,
+  value: string | undefined,
+  allowed: readonly T[],
+): T | undefined {
+  if (value === undefined || value === '') return undefined;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  process.stderr.write(
+    `tiny-code: ignoring ${name}="${value}" — expected one of: ${allowed.join(', ')}\n`,
+  );
+  return undefined;
+}
 
 const EscalateTargetSchema = z.object({
   provider: z.enum(PROVIDERS),
@@ -152,7 +173,7 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
 
   const provider: Provider =
     overrides.provider ??
-    (env.TINY_CODE_PROVIDER as Provider | undefined) ??
+    readEnvEnum('TINY_CODE_PROVIDER', env.TINY_CODE_PROVIDER, PROVIDERS) ??
     file.provider ??
     (anthropicApiKey
       ? 'anthropic'
@@ -165,7 +186,7 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
             : 'anthropic');
 
   const priority: Priority =
-    (env.TINY_CODE_PRIORITY as Priority | undefined) ?? file.priority ?? 'balanced';
+    readEnvEnum('TINY_CODE_PRIORITY', env.TINY_CODE_PRIORITY, PRIORITIES) ?? file.priority ?? 'balanced';
 
   // When the user pins a model, honor it. Otherwise let the catalog pick the
   // best fit for the cost/performance priority, falling back to a static

@@ -53,6 +53,23 @@ describe('DeepSeekProvider.send', () => {
     expect(done).toMatchObject({ usage: { inputTokens: 5, outputTokens: 2 } });
   });
 
+  it('synthesizes a provider-scoped tool-call id when the server omits one', async () => {
+    // The OpenAI wire format normally supplies an id; some servers don't. The
+    // fallback must stay non-empty so the result can be correlated next turn.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        {
+          choices: [
+            { delta: { tool_calls: [{ index: 0, function: { name: 'ls', arguments: '{}' } }] } },
+          ],
+        },
+      ]),
+    );
+    const provider = new DeepSeekProvider({ apiKey: 'k', model: 'deepseek-v4-pro' });
+    const call = (await collect(provider)).find((e) => e.type === 'tool_call');
+    expect(call).toMatchObject({ name: 'ls', id: 'deepseek-call-0' });
+  });
+
   it('reports a DeepSeek-specific error when the host is unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ENOTFOUND'));
     const provider = new DeepSeekProvider({ apiKey: 'k', model: 'deepseek-v4-pro' });

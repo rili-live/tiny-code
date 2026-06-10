@@ -156,7 +156,7 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     });
 
   const gate = new PermissionGate(config.allow, prompt);
-  let modelInfo = getModelInfo(config.model);
+  const modelInfo = getModelInfo(config.model);
   const ui = createTerminalUI({ model: provider.model, provider: provider.name });
   const agent = new AgentLoop({
     provider,
@@ -286,7 +286,6 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     }
     const prevModel = config.model;
     config.model = picked.id;
-    modelInfo = getModelInfo(picked.id);
     agent.setProvider(createProvider(config));
     console.log(
       pc.cyan(`Priority → ${priority}.`) +
@@ -378,7 +377,11 @@ export async function startRepl(overrides: CliOverrides): Promise<void> {
     const usage = agent.getUsage();
     if (usage.inputTokens > 0 || usage.outputTokens > 0) {
       const fmtN = (n: number) => n.toLocaleString('en-US');
-      const cost = modelInfo ? ` ≈ ${formatUsd(estimateCostUsd(usage, modelInfo))}` : '';
+      // Use the per-turn accumulated cost (matches /costs) rather than repricing
+      // the whole session at one model's rate — the active model can change
+      // mid-session via /priority, so a single-rate estimate would be wrong.
+      const sessionCost = ui.getTotals().cost;
+      const cost = sessionCost > 0 ? ` ≈ ${formatUsd(sessionCost)}` : '';
       console.log(
         pc.dim(
           `\nSession: ↑ ${fmtN(usage.inputTokens)}  ↓ ${fmtN(usage.outputTokens)} tokens total${cost}`,
