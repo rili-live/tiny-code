@@ -45,11 +45,12 @@ afterEach(async () => {
 });
 
 describe('loadConfig', () => {
-  it('infers anthropic when only ANTHROPIC_API_KEY is set', () => {
+  it('infers anthropic when only ANTHROPIC_API_KEY is set, picking the balanced model', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     const cfg = loadConfig({}, cwd);
     expect(cfg.provider).toBe('anthropic');
-    expect(cfg.model).toBe('claude-opus-4-8');
+    // Balanced is the default priority, so it favors capability-per-dollar (Sonnet) over Opus.
+    expect(cfg.model).toBe('claude-sonnet-4-6');
     expect(cfg.anthropicApiKey).toBe('sk-test');
   });
 
@@ -112,8 +113,16 @@ describe('loadConfig', () => {
     expect(cfg.improve.onSessionEnd).toBe(false);
   });
 
-  it('defaults to performance priority and the most capable model', () => {
+  it('defaults to balanced priority and the best capability-per-dollar model', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.priority).toBe('balanced');
+    expect(cfg.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('opts into the most capable model with performance priority', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.TINY_CODE_PRIORITY = 'performance';
     const cfg = loadConfig({}, cwd);
     expect(cfg.priority).toBe('performance');
     expect(cfg.model).toBe('claude-opus-4-8');
@@ -130,7 +139,7 @@ describe('loadConfig', () => {
   it('lets a pinned model win over the priority recommendation', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     const cfg = loadConfig({ model: 'claude-opus-4-8' }, cwd);
-    expect(cfg.priority).toBe('performance');
+    expect(cfg.priority).toBe('balanced');
     expect(cfg.model).toBe('claude-opus-4-8');
   });
 
@@ -166,12 +175,15 @@ describe('loadConfig', () => {
     expect(cfg.ollamaBaseUrl).toBe('http://gpu-box:11434/v1');
   });
 
-  it('infers deepseek when only DEEPSEEK_API_KEY is set, picking its flagship model', () => {
+  it('infers deepseek when only DEEPSEEK_API_KEY is set', () => {
     process.env.DEEPSEEK_API_KEY = 'sk-deep';
     const cfg = loadConfig({}, cwd);
     expect(cfg.provider).toBe('deepseek');
-    expect(cfg.model).toBe('deepseek-v4-pro');
+    // Balanced default favors the cheaper flash; performance pins the pro flagship.
+    expect(cfg.model).toBe('deepseek-v4-flash');
     expect(cfg.deepseekApiKey).toBe('sk-deep');
+    process.env.TINY_CODE_PRIORITY = 'performance';
+    expect(loadConfig({}, cwd).model).toBe('deepseek-v4-pro');
   });
 
   it('infers qwen from QWEN_API_KEY or DASHSCOPE_API_KEY', () => {

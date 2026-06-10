@@ -29,9 +29,11 @@ runaway costs.
 - Keep it current: when adding/repricing a model, update its entry **and**
   `CATALOG_AS_OF`. Anthropic pricing comes from the bundled claude-api reference;
   verify Gemini pricing against Google's published rates. Don't guess prices.
-- `priority` defaults to `performance`, which preserves the historical default
-  models (Opus for Anthropic, Gemini 2.5 Pro for Gemini). Don't change the
-  default without updating the config tests that assert those ids.
+- `priority` defaults to `balanced` (best capability-per-dollar behind a quality
+  floor), so the auto-picked model is cost-aware by default — e.g. Sonnet rather
+  than Opus for Anthropic. `performance` restores the historical most-capable
+  picks. Don't change the default without updating the config/catalog tests that
+  assert those ids.
 
 ## Boundaries
 - No business logic. This is a general-purpose tool.

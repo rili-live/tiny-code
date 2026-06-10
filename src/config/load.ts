@@ -162,7 +162,7 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
             : 'anthropic');
 
   const priority: Priority =
-    (env.TINY_CODE_PRIORITY as Priority | undefined) ?? file.priority ?? 'performance';
+    (env.TINY_CODE_PRIORITY as Priority | undefined) ?? file.priority ?? 'balanced';
 
   // When the user pins a model, honor it. Otherwise let the catalog pick the
   // best fit for the cost/performance priority, falling back to a static

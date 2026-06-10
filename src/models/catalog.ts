@@ -5,7 +5,8 @@ import type { Usage } from '../providers/types.js';
  * How to weigh cost vs. capability when auto-selecting a model.
  * - `performance`: most capable model (maximize quality, ignore price)
  * - `cost`: cheapest capable model (maximize savings)
- * - `balanced`: best capability-per-dollar among genuinely capable models
+ * - `balanced` (default): best capability-per-dollar among genuinely capable
+ *   models — `codingScore / blendedCostPerMTok`, gated by a quality floor
  */
 export type Priority = 'performance' | 'cost' | 'balanced';
 

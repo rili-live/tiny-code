@@ -26,7 +26,7 @@ Environment:
   QWEN_API_KEY         Required for the Qwen provider (or DASHSCOPE_API_KEY)
   TINY_CODE_OLLAMA_URL Ollama OpenAI-compatible base URL (default http://localhost:11434/v1)
   TINY_CODE_PRIORITY   performance | cost | balanced — auto-picks a model when
-                       none is pinned (default: performance)
+                       none is pinned (default: balanced)
 
 Cost-saving: set "routing": "local-first" with an "escalateTo" target in your
 config to run cheap/local models by default and escalate heavy tasks. Run /costs

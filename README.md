@@ -142,7 +142,7 @@ CLI flags.
   "provider": "anthropic",
   "model": "claude-opus-4-8",
   "ollamaBaseUrl": "http://localhost:11434/v1",
-  "priority": "performance",
+  "priority": "balanced",
   "maxTokens": 16000,
   "thinking": true,
   "effort": "high",
@@ -213,14 +213,19 @@ money and to pick a model that fits your cost/performance preference.
 - **Priority-driven selection.** When you don't pin a `model`, tiny-code picks
   one for you based on `priority`:
 
-  | `priority`      | Picks                                                        |
-  | --------------- | ----------------------------------------------------------- |
-  | `performance`   | The most capable model (the default — current behavior).    |
-  | `cost`          | The cheapest still-capable model.                           |
-  | `balanced`      | The best capability-per-dollar among capable models.        |
+  | `priority`      | Picks                                                            |
+  | --------------- | --------------------------------------------------------------- |
+  | `balanced`      | The best capability-per-dollar among capable models (default).  |
+  | `performance`   | The most capable model, ignoring price.                         |
+  | `cost`          | The cheapest still-capable model.                               |
+
+  `balanced` is the default: it ranks capable models by
+  `codingScore / blendedCostPerMTok` (a model's coding aptitude per blended
+  dollar, weighting input 80% / output 20%) behind a quality floor, so you get
+  strong-but-sensibly-priced models without opting in.
 
   ```json
-  { "priority": "balanced" }
+  { "priority": "performance" }
   ```
 
   Or per-session with `TINY_CODE_PRIORITY=cost`. Pinning `model` (config, env,
