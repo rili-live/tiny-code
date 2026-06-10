@@ -8,9 +8,17 @@ export type { AgentUI, AgentLoopOptions } from './agent/loop.js';
 export { buildSystemPrompt } from './agent/systemPrompt.js';
 export type { SystemPromptParams } from './agent/systemPrompt.js';
 
-export { createProvider, AnthropicProvider, GeminiProvider, OllamaProvider } from './providers/index.js';
+export {
+  createProvider,
+  AnthropicProvider,
+  GeminiProvider,
+  OllamaProvider,
+  DeepSeekProvider,
+  QwenProvider,
+  OpenAiCompatibleProvider,
+} from './providers/index.js';
 export type { ModelProvider, ProviderEvent, SendRequest, ToolSchema, Usage } from './providers/types.js';
-export { toOpenAiMessages, toOpenAiTools } from './providers/ollama.js';
+export { toOpenAiMessages, toOpenAiTools } from './providers/openai-compatible.js';
 
 export { classifyTurn } from './agent/router.js';
 export type { TaskWeight } from './agent/router.js';

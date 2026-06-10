@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { Priority } from '../models/catalog.js';
 import { recommendModel } from '../models/catalog.js';
 
-export type Provider = 'anthropic' | 'gemini' | 'ollama';
+export type Provider = 'anthropic' | 'gemini' | 'ollama' | 'deepseek' | 'qwen';
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type Routing = 'local-first' | 'off';
 export type { Priority } from '../models/catalog.js';
@@ -34,8 +34,14 @@ export interface ResolvedConfig {
   priority: Priority;
   anthropicApiKey: string | undefined;
   geminiApiKey: string | undefined;
+  deepseekApiKey: string | undefined;
+  qwenApiKey: string | undefined;
   /** OpenAI-compatible base URL for the Ollama provider. */
   ollamaBaseUrl: string;
+  /** Override for the DeepSeek API endpoint (defaults to DeepSeek's hosted URL). */
+  deepseekBaseUrl: string | undefined;
+  /** Override for the Qwen/DashScope API endpoint (defaults to DashScope's URL). */
+  qwenBaseUrl: string | undefined;
   maxTokens: number;
   thinking: boolean;
   effort: Effort;
@@ -69,21 +75,27 @@ const DEFAULT_MODELS: Record<Provider, string> = {
   anthropic: 'claude-opus-4-8',
   gemini: 'gemini-2.5-pro',
   ollama: 'qwen2.5-coder:7b',
+  deepseek: 'deepseek-v4-pro',
+  qwen: 'qwen3-coder-plus',
 };
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434/v1';
 
+const PROVIDERS = ['anthropic', 'gemini', 'ollama', 'deepseek', 'qwen'] as const;
+
 const EscalateTargetSchema = z.object({
-  provider: z.enum(['anthropic', 'gemini', 'ollama']),
+  provider: z.enum(PROVIDERS),
   model: z.string(),
   ollamaBaseUrl: z.string().url().optional(),
 });
 
 const FileConfigSchema = z
   .object({
-    provider: z.enum(['anthropic', 'gemini', 'ollama']).optional(),
+    provider: z.enum(PROVIDERS).optional(),
     model: z.string().optional(),
     ollamaBaseUrl: z.string().url().optional(),
+    deepseekBaseUrl: z.string().url().optional(),
+    qwenBaseUrl: z.string().url().optional(),
     priority: z.enum(['performance', 'cost', 'balanced']).optional(),
     maxTokens: z.number().int().positive().optional(),
     thinking: z.boolean().optional(),
@@ -132,12 +144,22 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
   const env = process.env;
   const anthropicApiKey = env.ANTHROPIC_API_KEY || undefined;
   const geminiApiKey = env.GEMINI_API_KEY || undefined;
+  const deepseekApiKey = env.DEEPSEEK_API_KEY || undefined;
+  const qwenApiKey = env.QWEN_API_KEY || env.DASHSCOPE_API_KEY || undefined;
 
   const provider: Provider =
     overrides.provider ??
     (env.TINY_CODE_PROVIDER as Provider | undefined) ??
     file.provider ??
-    (anthropicApiKey ? 'anthropic' : geminiApiKey ? 'gemini' : 'anthropic');
+    (anthropicApiKey
+      ? 'anthropic'
+      : geminiApiKey
+        ? 'gemini'
+        : deepseekApiKey
+          ? 'deepseek'
+          : qwenApiKey
+            ? 'qwen'
+            : 'anthropic');
 
   const priority: Priority =
     (env.TINY_CODE_PRIORITY as Priority | undefined) ?? file.priority ?? 'performance';
@@ -158,6 +180,8 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
   const effort = (env.TINY_CODE_EFFORT as Effort | undefined) ?? file.effort ?? 'high';
 
   const ollamaBaseUrl = env.TINY_CODE_OLLAMA_URL ?? file.ollamaBaseUrl ?? DEFAULT_OLLAMA_URL;
+  const deepseekBaseUrl = env.TINY_CODE_DEEPSEEK_URL ?? file.deepseekBaseUrl;
+  const qwenBaseUrl = env.TINY_CODE_QWEN_URL ?? file.qwenBaseUrl;
 
   const escalateTo = file.escalateTo;
   // Default to local-first whenever an escalation target is configured.
@@ -174,7 +198,11 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
     priority,
     anthropicApiKey,
     geminiApiKey,
+    deepseekApiKey,
+    qwenApiKey,
     ollamaBaseUrl,
+    deepseekBaseUrl,
+    qwenBaseUrl,
     maxTokens,
     thinking: file.thinking ?? true,
     effort,

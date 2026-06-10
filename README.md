@@ -3,9 +3,9 @@
 A small, extensible CLI coding agent built around one constraint: **keep token
 usage low**. As coding-agent costs climb, tiny-code automates the savings so
 you don't have to. Interactive terminal REPL, interchangeable **Anthropic**,
-**Gemini**, and **local (Ollama)** models, and just the core features you
-actually use: read/write/edit files, run shell commands, search code, and a
-custom commands/skills system. No business logic baked in.
+**Gemini**, **DeepSeek**, **Qwen Coder**, and **local (Ollama)** models, and just
+the core features you actually use: read/write/edit files, run shell commands,
+search code, and a custom commands/skills system. No business logic baked in.
 
 Run cheap, open-weight models locally and **escalate heavy work to a frontier
 model only when needed** — see [Local models & cost-aware routing](#local-models--cost-aware-routing).
@@ -29,12 +29,19 @@ node dist/cli.js
 
 ## Setup
 
-Provide at least one API key. If both are set, Anthropic is used by default.
+Provide at least one API key. If several are set, the default is the first
+available in this order: Anthropic, Gemini, DeepSeek, Qwen.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export GEMINI_API_KEY=...
+export DEEPSEEK_API_KEY=sk-...
+export QWEN_API_KEY=sk-...        # Alibaba DashScope key (DASHSCOPE_API_KEY also works)
 ```
+
+DeepSeek and Qwen are hosted, OpenAI-compatible coding models. Override their
+endpoints with `TINY_CODE_DEEPSEEK_URL` / `TINY_CODE_QWEN_URL` (or `deepseekBaseUrl`
+/ `qwenBaseUrl` in config) — e.g. to point Qwen at the international DashScope host.
 
 ## Usage
 
@@ -42,6 +49,8 @@ export GEMINI_API_KEY=...
 tiny-code                       # start the REPL (uses an available key)
 tiny-code --provider gemini     # force a provider
 tiny-code --model claude-opus-4-8
+tiny-code --provider deepseek --model deepseek-v4-pro     # DeepSeek's coding model
+tiny-code --provider qwen --model qwen3-coder-plus        # Qwen Coder
 tiny-code --provider ollama --model gemma3:12b   # run a local model (no API cost)
 ```
 
@@ -154,7 +163,8 @@ CLI flags.
 `routing: "local-first"` plus `escalateTo` enables cost-aware routing (see
 [above](#local-models--cost-aware-routing)); it defaults to `local-first`
 automatically whenever `escalateTo` is present. `ollamaBaseUrl` points at your
-Ollama server's OpenAI-compatible endpoint.
+Ollama server's OpenAI-compatible endpoint; `deepseekBaseUrl` / `qwenBaseUrl`
+override the DeepSeek and Qwen (DashScope) endpoints.
 
 Approximate cloud pricing used for the `/costs` estimate lives in the model
 catalog (`src/models/catalog.ts`) — edit it to match current vendor rates.

@@ -58,6 +58,18 @@ describe('recommendModel', () => {
     expect(recommendModel({ provider: 'gemini', priority: 'cost' })?.id).toBe('gemini-2.5-flash');
   });
 
+  it('picks the flagship coder model for the DeepSeek and Qwen providers', () => {
+    expect(recommendModel({ provider: 'deepseek', priority: 'performance' })?.id).toBe(
+      'deepseek-v4-pro',
+    );
+    expect(recommendModel({ provider: 'qwen', priority: 'performance' })?.id).toBe(
+      'qwen3-coder-plus',
+    );
+    // Their cheaper variants win on cost.
+    expect(recommendModel({ provider: 'deepseek', priority: 'cost' })?.id).toBe('deepseek-v4-flash');
+    expect(recommendModel({ provider: 'qwen', priority: 'cost' })?.id).toBe('qwen3-coder-flash');
+  });
+
   it('balanced trades cost against capability without dropping to the weakest', () => {
     expect(recommendModel({ provider: 'anthropic', priority: 'balanced' })?.id).toBe(
       'claude-sonnet-4-6',

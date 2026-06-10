@@ -12,8 +12,9 @@ Usage:
   tiny-code [options]
 
 Options:
-  --provider <name>   anthropic | gemini | ollama (default: inferred from API keys)
-  --model <id>        Model id override (e.g. claude-opus-4-8, gemma3:12b)
+  --provider <name>   anthropic | gemini | ollama | deepseek | qwen
+                      (default: inferred from API keys)
+  --model <id>        Model id override (e.g. claude-opus-4-8, qwen3-coder-plus)
   --config <path>     Path to a config JSON file
   -v, --version       Print version
   -h, --help          Show this help
@@ -21,6 +22,8 @@ Options:
 Environment:
   ANTHROPIC_API_KEY    Required for the Anthropic provider
   GEMINI_API_KEY       Required for the Gemini provider
+  DEEPSEEK_API_KEY     Required for the DeepSeek provider
+  QWEN_API_KEY         Required for the Qwen provider (or DASHSCOPE_API_KEY)
   TINY_CODE_OLLAMA_URL Ollama OpenAI-compatible base URL (default http://localhost:11434/v1)
   TINY_CODE_PRIORITY   performance | cost | balanced — auto-picks a model when
                        none is pinned (default: performance)

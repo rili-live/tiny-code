@@ -32,7 +32,7 @@ export interface ModelInfo {
  * from the bundled claude-api reference; Gemini figures from Google's published
  * API pricing.
  */
-export const CATALOG_AS_OF = '2026-06-08';
+export const CATALOG_AS_OF = '2026-06-10';
 
 /**
  * The known coding models, newest/most-capable first within each provider.
@@ -51,6 +51,15 @@ export const MODEL_CATALOG: ModelInfo[] = [
   { id: 'gemini-2.5-pro', provider: 'gemini', label: 'Gemini 2.5 Pro', inputPricePerMTok: 1.25, outputPricePerMTok: 10, contextWindow: 1_048_576, codingScore: 90 },
   { id: 'gemini-2.5-flash', provider: 'gemini', label: 'Gemini 2.5 Flash', inputPricePerMTok: 0.3, outputPricePerMTok: 2.5, contextWindow: 1_048_576, codingScore: 72 },
   { id: 'gemini-2.5-flash-lite', provider: 'gemini', label: 'Gemini 2.5 Flash-Lite', inputPricePerMTok: 0.1, outputPricePerMTok: 0.4, contextWindow: 1_048_576, codingScore: 55 },
+
+  // DeepSeek — DeepSeek API (cache-miss) pricing. The V4 family carries DeepSeek's
+  // coding capability; the legacy "deepseek-coder" model is retired.
+  { id: 'deepseek-v4-pro', provider: 'deepseek', label: 'DeepSeek V4 Pro', inputPricePerMTok: 1.74, outputPricePerMTok: 3.48, contextWindow: 1_048_576, codingScore: 91 },
+  { id: 'deepseek-v4-flash', provider: 'deepseek', label: 'DeepSeek V4 Flash', inputPricePerMTok: 0.14, outputPricePerMTok: 0.28, contextWindow: 1_048_576, codingScore: 80 },
+
+  // Qwen Coder — Alibaba DashScope pricing for the proprietary coder models.
+  { id: 'qwen3-coder-plus', provider: 'qwen', label: 'Qwen3 Coder Plus', inputPricePerMTok: 0.65, outputPricePerMTok: 3.25, contextWindow: 1_000_000, codingScore: 89 },
+  { id: 'qwen3-coder-flash', provider: 'qwen', label: 'Qwen3 Coder Flash', inputPricePerMTok: 0.195, outputPricePerMTok: 0.975, contextWindow: 1_000_000, codingScore: 78 },
 ];
 
 /** Look up catalog facts for a model id, or `undefined` if it's not tracked. */

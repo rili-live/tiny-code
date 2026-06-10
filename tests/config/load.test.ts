@@ -7,12 +7,17 @@ import { loadConfig } from '../../src/config/load.js';
 const ENV_KEYS = [
   'ANTHROPIC_API_KEY',
   'GEMINI_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'QWEN_API_KEY',
+  'DASHSCOPE_API_KEY',
   'TINY_CODE_PROVIDER',
   'TINY_CODE_MODEL',
   'TINY_CODE_PRIORITY',
   'TINY_CODE_MAX_TOKENS',
   'TINY_CODE_EFFORT',
   'TINY_CODE_OLLAMA_URL',
+  'TINY_CODE_DEEPSEEK_URL',
+  'TINY_CODE_QWEN_URL',
   'TINY_CODE_IMPROVE',
   'HOME',
 ];
@@ -159,6 +164,40 @@ describe('loadConfig', () => {
     process.env.TINY_CODE_OLLAMA_URL = 'http://gpu-box:11434/v1';
     const cfg = loadConfig({ provider: 'ollama' }, cwd);
     expect(cfg.ollamaBaseUrl).toBe('http://gpu-box:11434/v1');
+  });
+
+  it('infers deepseek when only DEEPSEEK_API_KEY is set, picking its flagship model', () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-deep';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('deepseek');
+    expect(cfg.model).toBe('deepseek-v4-pro');
+    expect(cfg.deepseekApiKey).toBe('sk-deep');
+  });
+
+  it('infers qwen from QWEN_API_KEY or DASHSCOPE_API_KEY', () => {
+    process.env.QWEN_API_KEY = 'sk-qwen';
+    expect(loadConfig({}, cwd).provider).toBe('qwen');
+    delete process.env.QWEN_API_KEY;
+    process.env.DASHSCOPE_API_KEY = 'sk-dash';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('qwen');
+    expect(cfg.model).toBe('qwen3-coder-plus');
+    expect(cfg.qwenApiKey).toBe('sk-dash');
+  });
+
+  it('prefers anthropic over deepseek/qwen when several keys are present', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-a';
+    process.env.DEEPSEEK_API_KEY = 'sk-d';
+    process.env.QWEN_API_KEY = 'sk-q';
+    expect(loadConfig({}, cwd).provider).toBe('anthropic');
+  });
+
+  it('reads provider-specific base URL overrides', () => {
+    process.env.TINY_CODE_DEEPSEEK_URL = 'https://proxy/deepseek/v1';
+    process.env.TINY_CODE_QWEN_URL = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+    const cfg = loadConfig({ provider: 'deepseek' }, cwd);
+    expect(cfg.deepseekBaseUrl).toBe('https://proxy/deepseek/v1');
+    expect(cfg.qwenBaseUrl).toBe('https://dashscope-intl.aliyuncs.com/compatible-mode/v1');
   });
 
   it('defaults routing to local-first when an escalateTo target is configured', async () => {
