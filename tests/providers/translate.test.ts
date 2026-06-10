@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toAnthropicMessages } from '../../src/providers/anthropic.js';
 import { toGeminiContents } from '../../src/providers/gemini.js';
-import { toOpenAiMessages, toOpenAiTools } from '../../src/providers/openaiFormat.js';
+import { toOpenAiMessages, toOpenAiTools } from '../../src/providers/openai-compatible.js';
 import type { Message } from '../../src/agent/types.js';
 
 const conversation: Message[] = [

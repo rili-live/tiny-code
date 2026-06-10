@@ -1,5 +1,5 @@
 import type { ModelProvider, ProviderEvent, SendRequest } from './types.js';
-import { toOpenAiMessages, toOpenAiTools, parseSse } from './openaiFormat.js';
+import { toOpenAiMessages, toOpenAiTools, parseSse } from './openai-compatible.js';
 
 export interface OpenAIProviderOptions {
   apiKey: string;
@@ -7,7 +7,7 @@ export interface OpenAIProviderOptions {
   /** Cap on tokens to generate per response. Omitted from the request if unset. */
   maxTokens?: number;
   /** Override the base URL, e.g. for Azure OpenAI or a compatible proxy. Defaults to https://api.openai.com/v1. */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
 }
 
 export class OpenAIProvider implements ModelProvider {

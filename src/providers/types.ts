@@ -34,7 +34,7 @@ export interface SendRequest {
  * {@link ProviderEvent}.
  */
 export interface ModelProvider {
-  readonly name: 'anthropic' | 'gemini' | 'ollama' | 'openai';
+  readonly name: 'anthropic' | 'gemini' | 'ollama' | 'openai' | 'deepseek' | 'qwen';
   readonly model: string;
   send(req: SendRequest): AsyncIterable<ProviderEvent>;
 }

@@ -24,7 +24,12 @@ function fmtTokens(n: number): string {
 
 /** Paid (non-local) providers, where missing pricing means "unknown" not "free". */
 function isCloud(provider?: string): boolean {
-  return provider === 'anthropic' || provider === 'gemini';
+  return (
+    provider === 'anthropic' ||
+    provider === 'gemini' ||
+    provider === 'deepseek' ||
+    provider === 'qwen'
+  );
 }
 
 export interface SessionTotals {

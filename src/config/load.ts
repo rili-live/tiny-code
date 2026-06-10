@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { Priority } from '../models/catalog.js';
 import { recommendModel } from '../models/catalog.js';
 
-export type Provider = 'anthropic' | 'gemini' | 'ollama' | 'openai';
+export type Provider = 'anthropic' | 'gemini' | 'ollama' | 'openai' | 'deepseek' | 'qwen';
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type Routing = 'local-first' | 'off';
 export type { Priority } from '../models/catalog.js';
@@ -30,15 +30,24 @@ export interface AllowRules {
 export interface ResolvedConfig {
   provider: Provider;
   model: string;
+  /** True when `model` was explicitly pinned (CLI/env/config), so changing
+   *  `priority` shouldn't re-pick it. */
+  modelPinned: boolean;
   /** Cost/performance bias used to auto-pick a model when none is pinned. */
   priority: Priority;
   anthropicApiKey: string | undefined;
   geminiApiKey: string | undefined;
   openaiApiKey: string | undefined;
+  deepseekApiKey: string | undefined;
+  qwenApiKey: string | undefined;
   /** OpenAI-compatible base URL for the Ollama provider. */
   ollamaBaseUrl: string;
   /** Base URL for the OpenAI provider. Defaults to https://api.openai.com/v1. */
   openaiBaseUrl: string | undefined;
+  /** Override for the DeepSeek API endpoint (defaults to DeepSeek's hosted URL). */
+  deepseekBaseUrl: string | undefined;
+  /** Override for the Qwen/DashScope API endpoint (defaults to DashScope's URL). */
+  qwenBaseUrl: string | undefined;
   maxTokens: number;
   thinking: boolean;
   effort: Effort;
@@ -73,22 +82,49 @@ const DEFAULT_MODELS: Record<Provider, string> = {
   gemini: 'gemini-2.5-pro',
   ollama: 'qwen2.5-coder:7b',
   openai: 'gpt-4.1',
+  deepseek: 'deepseek-v4-pro',
+  qwen: 'qwen3-coder-plus',
 };
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434/v1';
 
+const PROVIDERS = ['anthropic', 'gemini', 'ollama', 'openai', 'deepseek', 'qwen'] as const;
+const PRIORITIES = ['performance', 'cost', 'balanced'] as const;
+
+/**
+ * Read an env var constrained to a known set. An unrecognized value is ignored
+ * (with a warning) rather than cast through blindly: an unchecked cast lets a
+ * typo like `TINY_CODE_PRIORITY=performant` fall through `recommendModel` and
+ * silently pick an unintended model. Returns `undefined` so resolution falls
+ * back to the next source in precedence.
+ */
+function readEnvEnum<T extends string>(
+  name: string,
+  value: string | undefined,
+  allowed: readonly T[],
+): T | undefined {
+  if (value === undefined || value === '') return undefined;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  process.stderr.write(
+    `tiny-code: ignoring ${name}="${value}" — expected one of: ${allowed.join(', ')}\n`,
+  );
+  return undefined;
+}
+
 const EscalateTargetSchema = z.object({
-  provider: z.enum(['anthropic', 'gemini', 'ollama', 'openai']),
+  provider: z.enum(PROVIDERS),
   model: z.string(),
   ollamaBaseUrl: z.string().url().optional(),
 });
 
 const FileConfigSchema = z
   .object({
-    provider: z.enum(['anthropic', 'gemini', 'ollama', 'openai']).optional(),
+    provider: z.enum(PROVIDERS).optional(),
     model: z.string().optional(),
     ollamaBaseUrl: z.string().url().optional(),
     openaiBaseUrl: z.string().url().optional(),
+    deepseekBaseUrl: z.string().url().optional(),
+    qwenBaseUrl: z.string().url().optional(),
     priority: z.enum(['performance', 'cost', 'balanced']).optional(),
     maxTokens: z.number().int().positive().optional(),
     thinking: z.boolean().optional(),
@@ -138,15 +174,27 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
   const anthropicApiKey = env.ANTHROPIC_API_KEY || undefined;
   const geminiApiKey = env.GEMINI_API_KEY || undefined;
   const openaiApiKey = env.OPENAI_API_KEY || undefined;
+  const deepseekApiKey = env.DEEPSEEK_API_KEY || undefined;
+  const qwenApiKey = env.QWEN_API_KEY || env.DASHSCOPE_API_KEY || undefined;
 
   const provider: Provider =
     overrides.provider ??
-    (env.TINY_CODE_PROVIDER as Provider | undefined) ??
+    readEnvEnum('TINY_CODE_PROVIDER', env.TINY_CODE_PROVIDER, PROVIDERS) ??
     file.provider ??
-    (anthropicApiKey ? 'anthropic' : geminiApiKey ? 'gemini' : openaiApiKey ? 'openai' : 'anthropic');
+    (anthropicApiKey
+      ? 'anthropic'
+      : geminiApiKey
+        ? 'gemini'
+        : openaiApiKey
+          ? 'openai'
+          : deepseekApiKey
+            ? 'deepseek'
+            : qwenApiKey
+              ? 'qwen'
+              : 'anthropic');
 
   const priority: Priority =
-    (env.TINY_CODE_PRIORITY as Priority | undefined) ?? file.priority ?? 'performance';
+    readEnvEnum('TINY_CODE_PRIORITY', env.TINY_CODE_PRIORITY, PRIORITIES) ?? file.priority ?? 'balanced';
 
   // When the user pins a model, honor it. Otherwise let the catalog pick the
   // best fit for the cost/performance priority, falling back to a static
@@ -165,6 +213,8 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
 
   const ollamaBaseUrl = env.TINY_CODE_OLLAMA_URL ?? file.ollamaBaseUrl ?? DEFAULT_OLLAMA_URL;
   const openaiBaseUrl = env.TINY_CODE_OPENAI_URL ?? file.openaiBaseUrl ?? undefined;
+  const deepseekBaseUrl = env.TINY_CODE_DEEPSEEK_URL ?? file.deepseekBaseUrl;
+  const qwenBaseUrl = env.TINY_CODE_QWEN_URL ?? file.qwenBaseUrl;
 
   const escalateTo = file.escalateTo;
   // Default to local-first whenever an escalation target is configured.
@@ -178,12 +228,17 @@ export function loadConfig(overrides: CliOverrides = {}, cwd: string = process.c
   return {
     provider,
     model,
+    modelPinned: pinnedModel !== undefined,
     priority,
     anthropicApiKey,
     geminiApiKey,
     openaiApiKey,
+    deepseekApiKey,
+    qwenApiKey,
     ollamaBaseUrl,
     openaiBaseUrl,
+    deepseekBaseUrl,
+    qwenBaseUrl,
     maxTokens,
     thinking: file.thinking ?? true,
     effort,

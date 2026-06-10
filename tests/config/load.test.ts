@@ -8,6 +8,9 @@ const ENV_KEYS = [
   'ANTHROPIC_API_KEY',
   'GEMINI_API_KEY',
   'OPENAI_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'QWEN_API_KEY',
+  'DASHSCOPE_API_KEY',
   'TINY_CODE_PROVIDER',
   'TINY_CODE_MODEL',
   'TINY_CODE_PRIORITY',
@@ -15,6 +18,8 @@ const ENV_KEYS = [
   'TINY_CODE_EFFORT',
   'TINY_CODE_OLLAMA_URL',
   'TINY_CODE_OPENAI_URL',
+  'TINY_CODE_DEEPSEEK_URL',
+  'TINY_CODE_QWEN_URL',
   'TINY_CODE_IMPROVE',
   'HOME',
 ];
@@ -42,11 +47,12 @@ afterEach(async () => {
 });
 
 describe('loadConfig', () => {
-  it('infers anthropic when only ANTHROPIC_API_KEY is set', () => {
+  it('infers anthropic when only ANTHROPIC_API_KEY is set, picking the balanced model', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     const cfg = loadConfig({}, cwd);
     expect(cfg.provider).toBe('anthropic');
-    expect(cfg.model).toBe('claude-opus-4-8');
+    // Balanced is the default priority, so it favors capability-per-dollar (Sonnet) over Opus.
+    expect(cfg.model).toBe('claude-sonnet-4-6');
     expect(cfg.anthropicApiKey).toBe('sk-test');
   });
 
@@ -109,8 +115,38 @@ describe('loadConfig', () => {
     expect(cfg.improve.onSessionEnd).toBe(false);
   });
 
-  it('defaults to performance priority and the most capable model', () => {
+  it('defaults to balanced priority and the best capability-per-dollar model', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.priority).toBe('balanced');
+    expect(cfg.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('flags whether the model was pinned', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    expect(loadConfig({}, cwd).modelPinned).toBe(false);
+    expect(loadConfig({ model: 'claude-opus-4-8' }, cwd).modelPinned).toBe(true);
+  });
+
+  it('ignores an invalid TINY_CODE_PRIORITY instead of silently mis-picking a model', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.TINY_CODE_PRIORITY = 'performant'; // typo
+    const cfg = loadConfig({}, cwd);
+    // Falls back to the default priority + its model, not an arbitrary catalog entry.
+    expect(cfg.priority).toBe('balanced');
+    expect(cfg.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('ignores an invalid TINY_CODE_PROVIDER and falls back to key inference', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.TINY_CODE_PROVIDER = 'mistral'; // unsupported
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('anthropic');
+  });
+
+  it('opts into the most capable model with performance priority', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.TINY_CODE_PRIORITY = 'performance';
     const cfg = loadConfig({}, cwd);
     expect(cfg.priority).toBe('performance');
     expect(cfg.model).toBe('claude-opus-4-8');
@@ -127,7 +163,7 @@ describe('loadConfig', () => {
   it('lets a pinned model win over the priority recommendation', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     const cfg = loadConfig({ model: 'claude-opus-4-8' }, cwd);
-    expect(cfg.priority).toBe('performance');
+    expect(cfg.priority).toBe('balanced');
     expect(cfg.model).toBe('claude-opus-4-8');
   });
 
@@ -154,8 +190,8 @@ describe('loadConfig', () => {
     process.env.OPENAI_API_KEY = 'sk-openai-test';
     const cfg = loadConfig({}, cwd);
     expect(cfg.provider).toBe('openai');
-    // performance priority picks the highest-scoring OpenAI model (o3)
-    expect(cfg.model).toBe('o3');
+    // the default 'balanced' priority picks the best cost/capability OpenAI model
+    expect(cfg.model).toBe('o4-mini');
     expect(cfg.openaiApiKey).toBe('sk-openai-test');
   });
 
@@ -184,6 +220,43 @@ describe('loadConfig', () => {
     process.env.TINY_CODE_OLLAMA_URL = 'http://gpu-box:11434/v1';
     const cfg = loadConfig({ provider: 'ollama' }, cwd);
     expect(cfg.ollamaBaseUrl).toBe('http://gpu-box:11434/v1');
+  });
+
+  it('infers deepseek when only DEEPSEEK_API_KEY is set', () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-deep';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('deepseek');
+    // Balanced default favors the cheaper flash; performance pins the pro flagship.
+    expect(cfg.model).toBe('deepseek-v4-flash');
+    expect(cfg.deepseekApiKey).toBe('sk-deep');
+    process.env.TINY_CODE_PRIORITY = 'performance';
+    expect(loadConfig({}, cwd).model).toBe('deepseek-v4-pro');
+  });
+
+  it('infers qwen from QWEN_API_KEY or DASHSCOPE_API_KEY', () => {
+    process.env.QWEN_API_KEY = 'sk-qwen';
+    expect(loadConfig({}, cwd).provider).toBe('qwen');
+    delete process.env.QWEN_API_KEY;
+    process.env.DASHSCOPE_API_KEY = 'sk-dash';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('qwen');
+    expect(cfg.model).toBe('qwen3-coder-plus');
+    expect(cfg.qwenApiKey).toBe('sk-dash');
+  });
+
+  it('prefers anthropic over deepseek/qwen when several keys are present', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-a';
+    process.env.DEEPSEEK_API_KEY = 'sk-d';
+    process.env.QWEN_API_KEY = 'sk-q';
+    expect(loadConfig({}, cwd).provider).toBe('anthropic');
+  });
+
+  it('reads provider-specific base URL overrides', () => {
+    process.env.TINY_CODE_DEEPSEEK_URL = 'https://proxy/deepseek/v1';
+    process.env.TINY_CODE_QWEN_URL = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+    const cfg = loadConfig({ provider: 'deepseek' }, cwd);
+    expect(cfg.deepseekBaseUrl).toBe('https://proxy/deepseek/v1');
+    expect(cfg.qwenBaseUrl).toBe('https://dashscope-intl.aliyuncs.com/compatible-mode/v1');
   });
 
   it('defaults routing to local-first when an escalateTo target is configured', async () => {

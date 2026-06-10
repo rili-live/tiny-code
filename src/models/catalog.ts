@@ -5,7 +5,8 @@ import type { Usage } from '../providers/types.js';
  * How to weigh cost vs. capability when auto-selecting a model.
  * - `performance`: most capable model (maximize quality, ignore price)
  * - `cost`: cheapest capable model (maximize savings)
- * - `balanced`: best capability-per-dollar among genuinely capable models
+ * - `balanced` (default): best capability-per-dollar among genuinely capable
+ *   models — `codingScore / blendedCostPerMTok`, gated by a quality floor
  */
 export type Priority = 'performance' | 'cost' | 'balanced';
 
@@ -60,6 +61,15 @@ export const MODEL_CATALOG: ModelInfo[] = [
   { id: 'gpt-4.1-mini', provider: 'openai', label: 'GPT-4.1 Mini', inputPricePerMTok: 0.4, outputPricePerMTok: 1.6, contextWindow: 1_000_000, codingScore: 72 },
   { id: 'gpt-4o-mini', provider: 'openai', label: 'GPT-4o Mini', inputPricePerMTok: 0.15, outputPricePerMTok: 0.6, contextWindow: 128_000, codingScore: 65 },
   { id: 'gpt-4.1-nano', provider: 'openai', label: 'GPT-4.1 Nano', inputPricePerMTok: 0.1, outputPricePerMTok: 0.4, contextWindow: 1_000_000, codingScore: 50 },
+
+  // DeepSeek — DeepSeek API (cache-miss) pricing. The V4 family carries DeepSeek's
+  // coding capability; the legacy "deepseek-coder" model is retired.
+  { id: 'deepseek-v4-pro', provider: 'deepseek', label: 'DeepSeek V4 Pro', inputPricePerMTok: 1.74, outputPricePerMTok: 3.48, contextWindow: 1_048_576, codingScore: 91 },
+  { id: 'deepseek-v4-flash', provider: 'deepseek', label: 'DeepSeek V4 Flash', inputPricePerMTok: 0.14, outputPricePerMTok: 0.28, contextWindow: 1_048_576, codingScore: 80 },
+
+  // Qwen Coder — Alibaba DashScope pricing for the proprietary coder models.
+  { id: 'qwen3-coder-plus', provider: 'qwen', label: 'Qwen3 Coder Plus', inputPricePerMTok: 0.65, outputPricePerMTok: 3.25, contextWindow: 1_000_000, codingScore: 89 },
+  { id: 'qwen3-coder-flash', provider: 'qwen', label: 'Qwen3 Coder Flash', inputPricePerMTok: 0.195, outputPricePerMTok: 0.975, contextWindow: 1_000_000, codingScore: 78 },
 ];
 
 /** Look up catalog facts for a model id, or `undefined` if it's not tracked. */
