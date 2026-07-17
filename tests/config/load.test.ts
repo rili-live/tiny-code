@@ -7,6 +7,7 @@ import { loadConfig } from '../../src/config/load.js';
 const ENV_KEYS = [
   'ANTHROPIC_API_KEY',
   'GEMINI_API_KEY',
+  'OPENAI_API_KEY',
   'DEEPSEEK_API_KEY',
   'QWEN_API_KEY',
   'DASHSCOPE_API_KEY',
@@ -16,6 +17,7 @@ const ENV_KEYS = [
   'TINY_CODE_MAX_TOKENS',
   'TINY_CODE_EFFORT',
   'TINY_CODE_OLLAMA_URL',
+  'TINY_CODE_OPENAI_URL',
   'TINY_CODE_DEEPSEEK_URL',
   'TINY_CODE_QWEN_URL',
   'TINY_CODE_IMPROVE',
@@ -182,6 +184,29 @@ describe('loadConfig', () => {
     process.env.TINY_CODE_MODEL = 'from-env';
     const cfg = loadConfig({}, cwd);
     expect(cfg.model).toBe('from-env');
+  });
+
+  it('infers openai when only OPENAI_API_KEY is set', () => {
+    process.env.OPENAI_API_KEY = 'sk-openai-test';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('openai');
+    // the default 'balanced' priority picks the best cost/capability OpenAI model
+    expect(cfg.model).toBe('o4-mini');
+    expect(cfg.openaiApiKey).toBe('sk-openai-test');
+  });
+
+  it('prefers anthropic over openai when both keys are present', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-anthropic';
+    process.env.OPENAI_API_KEY = 'sk-openai';
+    const cfg = loadConfig({}, cwd);
+    expect(cfg.provider).toBe('anthropic');
+  });
+
+  it('honors TINY_CODE_OPENAI_URL over the default', () => {
+    process.env.OPENAI_API_KEY = 'sk-openai-test';
+    process.env.TINY_CODE_OPENAI_URL = 'https://my-azure-endpoint.openai.azure.com/openai';
+    const cfg = loadConfig({ provider: 'openai' }, cwd);
+    expect(cfg.openaiBaseUrl).toBe('https://my-azure-endpoint.openai.azure.com/openai');
   });
 
   it('supports the ollama provider with its default model and base URL', () => {
